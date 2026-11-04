@@ -124,8 +124,10 @@ Per run:
   ],
   "timeline": {
     "ruleset": "B4",
-    "jobs":  [{"id": 1, "start": 120, "end": 1900, "where": "cpu-3", "on_cloud": false, "late": false}],
-    "cloud": [{"id": "c1", "type": "gpu_1", "requested": 3600, "ready": 3690, "released": 7200}]
+    "jobs":  [{"id": 1, "start": 120, "end": 1900, "where": "cpu-3", "on_cloud": false, "late": false,
+               "arrival": 60, "deadline": 5000, "est_runtime": 2400, "cores": 8, "mem_gb": 16, "gpus": 0}],
+    "cloud": [{"id": "c1", "type": "gpu_1", "requested": 3600, "ready": 3690, "released": 7200,
+               "job_id": 42, "price_per_h": 58, "cost": 56.55}]
   }
 }
 ```

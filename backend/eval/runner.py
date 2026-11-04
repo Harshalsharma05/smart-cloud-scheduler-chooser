@@ -13,12 +13,17 @@ MISS_REF, SLOWDOWN_REF, COST_REF = "B2", "B2", "B5"
 
 
 def timeline(jobs, pool) -> dict:
+    end = max(j.end for j in jobs)
     return {
         "jobs": [{"id": j.id, "start": j.start, "end": j.end,
                   "where": j.instance_id if j.on_cloud else j.node_id, "on_cloud": j.on_cloud,
-                  "late": j.deadline is not None and j.end > j.deadline} for j in jobs],
+                  "late": j.deadline is not None and j.end > j.deadline,
+                  "arrival": j.arrival, "deadline": j.deadline, "est_runtime": j.est_runtime,
+                  "cores": j.cores, "mem_gb": j.mem_gb, "gpus": j.gpus} for j in jobs],
         "cloud": [{"id": i.id, "type": i.type.name, "requested": i.requested_at,
-                   "ready": i.ready_at, "released": i.released_at} for i in pool.instances.values()],
+                   "ready": i.ready_at, "released": i.released_at, "job_id": i.job_id,
+                   "price_per_h": i.type.price_per_h, "cost": round(pool.cost(i, end), 2)}
+                  for i in pool.instances.values()],
     }
 
 

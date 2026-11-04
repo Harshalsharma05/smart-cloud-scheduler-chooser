@@ -52,19 +52,81 @@ td.best { background: var(--win-bg); font-weight: 700; }
 .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .chart { padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
 
-.timeline { padding: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
-.tl-controls { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-bottom: 8px; font-size: 0.85rem; }
-.tl-controls label { display: flex; gap: 8px; align-items: center; }
-.tl-controls input[type='range'] { width: 240px; }
-.tl-grid { stroke: var(--border); stroke-width: 1; }
-.tl-axis { font-size: 10px; fill: var(--muted); }
-.tl-title { font-size: 11px; font-weight: 600; fill: var(--text); }
-.tl-cluster-job { fill: #4f6bd8; background: #4f6bd8; }
-.tl-cloud-job { fill: #e8912d; background: #e8912d; }
-.tl-late { stroke: #d62828; stroke-width: 1.5; }
-.tl-late-sw { border: 2px solid #d62828; }
-.tl-boot { fill: #f5d3a6; background: #f5d3a6; }
-.tl-billed { fill: #b8641a; background: #b8641a; }
+/* ---------- timeline ---------- */
+.timeline { position: relative; padding: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+.tl-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.tl-head h3 { margin: 0; font-size: 1.05rem; }
+.tl-tools { display: flex; align-items: center; gap: 8px; }
+.tl-tools button { padding: 5px 12px; font-size: 0.85rem; }
+.tl-tools button:disabled { opacity: 0.45; cursor: default; }
+.tl-range { font-variant-numeric: tabular-nums; font-weight: 600; margin-right: 4px; }
+.tl-cap { font-size: 0.82rem; color: var(--muted); margin: 4px 0 2px; }
 
-.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; font-size: 0.8rem; color: var(--muted); }
-.sw { display: inline-block; width: 14px; height: 10px; vertical-align: middle; margin-right: 4px; border-radius: 2px; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border-radius: 999px; font-size: 0.85rem;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.chip:hover { border-color: var(--accent); }
+.chip.off { opacity: 0.45; text-decoration: line-through; }
+.chip.active { border-color: var(--c-late); background: color-mix(in srgb, var(--c-late) 12%, var(--bg)); }
+.chip-count { font-size: 0.75rem; font-weight: 700; padding: 0 7px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border); }
+.tl-help { margin: 0 0 0 4px; font-size: 0.8rem; }
+.sw { display: inline-block; width: 16px; height: 11px; border-radius: 3px; }
+.sw-cluster { background: var(--c-cluster); }
+.sw-cloud { background: var(--c-cloud); }
+.sw-late { background: transparent; border: 2px solid var(--c-late); }
+.sw-boot { background: var(--c-boot); }
+.sw-billed { background: var(--c-billed); }
+
+.tl-svg, .tl-overview { display: block; user-select: none; touch-action: none; }
+.tl-svg { cursor: crosshair; }
+.tl-overview { cursor: grab; margin-bottom: 6px; }
+.tl-overview:active { cursor: grabbing; }
+.ov-bg { fill: var(--bg); stroke: var(--border); }
+.ov-cluster { fill: var(--c-cluster); opacity: 0.75; }
+.ov-cloud { fill: var(--c-cloud); opacity: 0.9; }
+.ov-dim { fill: var(--panel); opacity: 0.6; pointer-events: none; }
+.ov-window { fill: none; stroke: var(--accent); stroke-width: 2; pointer-events: none; }
+
+.tl-stripe { fill: var(--stripe); }
+.tl-grid { stroke: var(--border); stroke-width: 1; }
+.tl-grid-minor { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.6; }
+.tl-sep { stroke: var(--border); stroke-width: 1; }
+.tl-axis { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.tl-section { font-size: 12px; font-weight: 700; fill: var(--text); }
+.tl-section-sub { font-size: 10px; fill: var(--muted); }
+
+.bar { transition: opacity 0.15s; }
+.tl-cluster-job { fill: var(--c-cluster); }
+.tl-cloud-job { fill: var(--c-cloud); }
+.tl-boot { fill: var(--c-boot); }
+.tl-billed { fill: var(--c-billed); }
+.tl-late { stroke: var(--c-late); stroke-width: 1.6; }
+.has-hover .bar:not(.hovered) { opacity: 0.35; }
+.bar.hovered { stroke: var(--text); stroke-width: 1.5; }
+.late-focus .tl-cluster-job:not(.tl-late), .late-focus .tl-cloud-job:not(.tl-late) { opacity: 0.18; }
+.tl-deadline { stroke: var(--c-late); stroke-width: 2; pointer-events: none; }
+.tl-deadline.ok { stroke: var(--c-ok); }
+
+.tl-select { fill: var(--select); stroke: var(--accent); stroke-dasharray: 4 3; pointer-events: none; }
+.tl-select-label { font-size: 11px; font-weight: 600; fill: var(--accent); pointer-events: none; }
+.tl-cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.tl-cross-box { fill: var(--text); }
+.tl-cross-text { font-size: 10px; font-weight: 600; fill: var(--bg); font-variant-numeric: tabular-nums; }
+
+.tl-tip {
+  position: absolute; z-index: 10; pointer-events: none;
+  min-width: 230px; max-width: 280px; padding: 10px 12px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);
+  font-size: 0.8rem;
+}
+.tip-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; }
+.tip-row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+.tip-row span:first-child { color: var(--muted); }
+.tip-row span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.badge { font-size: 0.7rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); }
+.badge.late { background: var(--c-late); border-color: var(--c-late); color: white; }
+.badge.ok { background: var(--c-ok); border-color: var(--c-ok); color: white; }
