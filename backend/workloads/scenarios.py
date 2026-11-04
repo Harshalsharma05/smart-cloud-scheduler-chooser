@@ -19,8 +19,8 @@ SCENARIOS = {
     },
     "deadline_heavy": {
         "label": "Deadline heavy",
-        "description": "~40 jobs/h, most jobs have tight deadlines.",
+        "description": "Busy ~40 jobs/h all day, half the jobs have deadlines (slack 2-4x).",
         "rates": [(0, 24, 40)],
-        "gpu_frac": 0.20, "deadline_frac": 0.70, "slack": (1.3, 2.5),
+        "gpu_frac": 0.20, "deadline_frac": 0.50, "slack": (2.0, 4.0),
     },
 }
