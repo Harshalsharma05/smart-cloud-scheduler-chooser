@@ -14,7 +14,7 @@ def run_metrics(jobs, pool, cfg) -> dict:
         "miss_rate": len(late) / len(deadline_jobs) if deadline_jobs else 0.0,
         "avg_wait_min": sum(waits) / len(jobs) / 60,
         "avg_bounded_slowdown": sum(slowdowns) / len(jobs),
-        "cloud_cost": pool.total_cost(end),
+        "cloud_cost": float(pool.total_cost(end)),
         "cloud_instance_hours": sum(pool.billed_seconds(i, end) for i in pool.instances.values()) / 3600,
     }
 

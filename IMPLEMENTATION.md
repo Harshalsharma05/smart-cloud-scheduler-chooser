@@ -112,10 +112,12 @@ Per run:
 - `GET /health` → `{"ok": true}`
 - `GET /scenarios` → `[{"id": "rush", "label": "Rush hour", "description": "..."}]`
 - `GET /rulesets` → `[{"id": "B2", "order": "FCFS", "backfill": "EASY", "burst": "NEVER", "label": "..."}]`
-- `POST /run` body `{"scenario": "rush", "seed": 1, "rulesets": ["B2","B3","B4","B5"], "timeline_for": "B4"}` →
+- `GET /profiles` → `[{"id": "balanced", "w_miss": 0.4, "w_slowdown": 0.3, "w_cost": 0.3}, ...]`
+- `POST /run` body `{"scenario": "rush", "seed": 1, "rulesets": ["B2","B3","B4","B5"], "timeline_for": "B4", "profile": "balanced"}` →
+  (every field optional; defaults as shown. `profile` picks the score weights. Unknown ids → 400.)
 ```json
 {
-  "scenario": "rush", "seed": 1, "n_jobs": 612,
+  "scenario": "rush", "seed": 1, "profile": "balanced", "n_jobs": 612,
   "results": [
     {"ruleset": "B2", "late_pct": 31.2, "avg_wait_min": 48.5, "avg_bounded_slowdown": 6.1,
      "cloud_cost": 0.0, "cloud_instance_hours": 0.0, "score": 0.52}
