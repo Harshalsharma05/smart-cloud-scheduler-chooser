@@ -94,8 +94,16 @@ Per run:
 - `avg_wait_min` (start − arrival)
 - `avg_bounded_slowdown` = mean of max(1, (wait + runtime) / max(runtime, 10 s))
 - `cloud_cost` (units), `cloud_instance_hours`
-- `score J` = 0.4·miss_rate + 0.3·(slowdown / slowdown_ref) + 0.3·(cost / cost_ref)
-  - **Simplification for now:** `slowdown_ref` = B2's slowdown on the same scenario+seed, `cost_ref` = B5's cost on the same scenario+seed (use 1 if zero). Lower J is better.
+- `score J` = w_miss·(miss_rate / miss_ref) + w_slowdown·(slowdown / slowdown_ref) + w_cost·(cost / cost_ref)
+  - References, all from the same scenario+seed: `miss_ref` = max(B2's miss rate, 0.05), `slowdown_ref` = B2's slowdown, `cost_ref` = B5's cost (use 1 if zero). Lower J is better.
+  - Weight profiles (`configs/default.yaml`, `score.profiles`):
+
+    | Profile | w_miss | w_slowdown | w_cost |
+    |---|---|---|---|
+    | balanced (default) | 0.4 | 0.3 | 0.3 |
+    | deadline_first | 0.6 | 0.3 | 0.1 |
+    | cost_first | 0.2 | 0.3 | 0.5 |
+  - `python -m eval.runner --scenario rush --seed 1 --profile deadline_first`
 
 ---
 

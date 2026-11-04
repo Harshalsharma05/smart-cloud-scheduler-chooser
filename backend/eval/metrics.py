@@ -19,11 +19,9 @@ def run_metrics(jobs, pool, cfg) -> dict:
     }
 
 
-def score(m, slowdown_ref, cost_ref, cfg) -> float:
-    """J = w_miss*miss_rate + w_slow*(slowdown/slowdown_ref) + w_cost*(cost/cost_ref). Lower is better."""
-    w = cfg["score"]
-    slowdown_ref = slowdown_ref or 1
-    cost_ref = cost_ref or 1
-    return (w["w_miss"] * m["miss_rate"]
-            + w["w_slowdown"] * m["avg_bounded_slowdown"] / slowdown_ref
-            + w["w_cost"] * m["cloud_cost"] / cost_ref)
+def score(m, miss_ref, slowdown_ref, cost_ref, weights) -> float:
+    """J = w_miss*(miss/miss_ref) + w_slowdown*(slowdown/slowdown_ref) + w_cost*(cost/cost_ref).
+    Lower is better. A zero slowdown or cost reference is replaced by 1."""
+    return (weights["w_miss"] * m["miss_rate"] / miss_ref
+            + weights["w_slowdown"] * m["avg_bounded_slowdown"] / (slowdown_ref or 1)
+            + weights["w_cost"] * m["cloud_cost"] / (cost_ref or 1))

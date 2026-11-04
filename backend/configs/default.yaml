@@ -24,8 +24,11 @@ cloud:
 burst:
   deadline_margin_s: 600    # DEADLINE_AWARE rents if projected finish > deadline - margin
 
-score:                      # balanced profile
-  w_miss: 0.4
-  w_slowdown: 0.3
-  w_cost: 0.3
+score:
   slowdown_tau_s: 10
+  miss_ref_floor: 0.05      # miss_ref = max(B2 miss rate, this)
+  default_profile: balanced
+  profiles:                 # weights for J (miss, slowdown, cost)
+    balanced:       {w_miss: 0.4, w_slowdown: 0.3, w_cost: 0.3}
+    deadline_first: {w_miss: 0.6, w_slowdown: 0.3, w_cost: 0.1}
+    cost_first:     {w_miss: 0.2, w_slowdown: 0.3, w_cost: 0.5}

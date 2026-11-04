@@ -9,7 +9,7 @@ from sim.models import load_config
 from workloads.generator import generate
 from workloads.scenarios import SCENARIOS
 
-SLOWDOWN_REF, COST_REF = "B2", "B5"
+MISS_REF, SLOWDOWN_REF, COST_REF = "B2", "B2", "B5"
 
 
 def timeline(jobs, pool) -> dict:
@@ -22,17 +22,20 @@ def timeline(jobs, pool) -> dict:
     }
 
 
-def run_comparison(scenario, seed, rulesets=None, timeline_for=None, cfg=None) -> dict:
+def run_comparison(scenario, seed, rulesets=None, timeline_for=None, profile=None, cfg=None) -> dict:
     """Run the rule sets on one scenario+seed. Returns the POST /run response shape."""
     cfg = cfg or load_config()
+    profile = profile or cfg["score"]["default_profile"]
+    weights = cfg["score"]["profiles"][profile]
     rulesets = rulesets or list(RULESETS)
     timeline_for = timeline_for or ("B4" if "B4" in rulesets else rulesets[0])
     jobs = generate(scenario, seed)
 
     runs, metrics = {}, {}
-    for rid in dict.fromkeys(rulesets + [SLOWDOWN_REF, COST_REF, timeline_for]):  # ordered, no repeats
+    for rid in dict.fromkeys(rulesets + [MISS_REF, SLOWDOWN_REF, COST_REF, timeline_for]):  # ordered, no repeats
         runs[rid] = simulate(jobs, cfg, RULESETS[rid])
         metrics[rid] = run_metrics(*runs[rid], cfg)
+    miss_ref = max(metrics[MISS_REF]["miss_rate"], cfg["score"]["miss_ref_floor"])
     slowdown_ref = metrics[SLOWDOWN_REF]["avg_bounded_slowdown"]
     cost_ref = metrics[COST_REF]["cloud_cost"]
 
@@ -46,14 +49,14 @@ def run_comparison(scenario, seed, rulesets=None, timeline_for=None, cfg=None) -
             "avg_bounded_slowdown": round(m["avg_bounded_slowdown"], 2),
             "cloud_cost": round(m["cloud_cost"], 1),
             "cloud_instance_hours": round(m["cloud_instance_hours"], 2),
-            "score": round(score(m, slowdown_ref, cost_ref, cfg), 3),
+            "score": round(score(m, miss_ref, slowdown_ref, cost_ref, weights), 3),
         })
-    return {"scenario": scenario, "seed": seed, "n_jobs": len(jobs), "results": results,
+    return {"scenario": scenario, "seed": seed, "profile": profile, "n_jobs": len(jobs), "results": results,
             "timeline": {"ruleset": timeline_for, **timeline(*runs[timeline_for])}}
 
 
 def print_table(out):
-    print(f"scenario={out['scenario']} seed={out['seed']} jobs={out['n_jobs']}")
+    print(f"scenario={out['scenario']} seed={out['seed']} profile={out['profile']} jobs={out['n_jobs']}")
     cols = ["late_pct", "avg_wait_min", "avg_bounded_slowdown", "cloud_cost", "cloud_instance_hours", "score"]
     heads = ["late %", "wait min", "slowdown", "cost", "inst h", "score J"]
     print(f"{'rule':5}" + "".join(f"{h:>10}" for h in heads))
@@ -66,5 +69,6 @@ if __name__ == "__main__":
     ap.add_argument("--scenario", default="rush", choices=list(SCENARIOS))
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--rulesets", nargs="+", default=list(RULESETS), choices=list(RULESETS))
+    ap.add_argument("--profile", default=None, choices=list(load_config()["score"]["profiles"]))
     args = ap.parse_args()
-    print_table(run_comparison(args.scenario, args.seed, args.rulesets))
+    print_table(run_comparison(args.scenario, args.seed, args.rulesets, profile=args.profile))
