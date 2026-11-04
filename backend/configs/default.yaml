@@ -1,0 +1,29 @@
+# Default world for the progress-check build. All values are ASSUMPTIONS, edit freely.
+time_unit: seconds
+
+cluster:
+  # name, count, cores, mem_gb, gpus
+  node_classes:
+    - {name: cpu,     count: 16, cores: 32, mem_gb: 128, gpus: 0}
+    - {name: gpu,     count: 4,  cores: 32, mem_gb: 256, gpus: 4}
+    - {name: highmem, count: 2,  cores: 64, mem_gb: 1024, gpus: 0}
+
+cloud:
+  boot_delay_s: 90          # requested -> ready
+  max_instances: 22         # about the size of the cluster
+  min_billed_s: 60          # per-second billing, 60 s minimum, from READY to RELEASED
+  # price in units per hour (1 unit = one CPU core-hour); GPU:CPU core ratio ~50:1
+  instance_types:
+    - {name: cpu_small, cores: 8,  mem_gb: 32,  gpus: 0, price_per_h: 8}
+    - {name: cpu_large, cores: 32, mem_gb: 128, gpus: 0, price_per_h: 32}
+    - {name: gpu_1,     cores: 8,  mem_gb: 64,  gpus: 1, price_per_h: 58}
+    - {name: highmem,   cores: 16, mem_gb: 512, gpus: 0, price_per_h: 24}
+
+burst:
+  deadline_margin_s: 600    # DEADLINE_AWARE rents if projected finish > deadline - margin
+
+score:                      # balanced profile
+  w_miss: 0.4
+  w_slowdown: 0.3
+  w_cost: 0.3
+  slowdown_tau_s: 10
