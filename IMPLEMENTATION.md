@@ -191,11 +191,13 @@ One page, plain CSS, no router, no state library.
 ---
 
 ## Progress-check demo script (≈3 min)
-1. Open the page, run `deadline_heavy`: FCFS misses many deadlines; EDF + deadline-aware renting saves them at some cloud cost; immediate renting is fastest and most expensive.
-2. Run `quiet`: the cheap rule set wins now. → "no rule wins everywhere".
-3. Show the timeline: jobs on nodes, a cloud machine booting and billed.
-4. Show `/docs` and the passing tests (determinism, slide example, cloud billing, backfill).
-5. Next: choosers (rules, look-ahead, ML, LLM) and the attack study.
+All runs use seed 1.
+1. Profile `balanced`, scenario `quiet` → best is **B3**: nothing is under pressure, so the cheap cluster-only rule set wins.
+2. Profile `balanced`, scenario `rush` → best is **B4**: EDF + deadline-aware renting saves every deadline at a small cloud cost. → "no rule wins everywhere".
+3. Stay on `rush`, change only the profile: `cost_first` → **B3**, `deadline_first` → **B5**. → what "best" means depends on what the operator values.
+4. Show the timeline (B4 on rush): jobs on the cluster vs on cloud, late jobs outlined, cloud instances booting and billed; move the window slider into the rush hours.
+5. Show `/docs` and the passing tests (slide example FCFS/EDF, cloud billing, backfill).
+6. Next: choosers (rules, look-ahead, ML, LLM) and the attack study.
 
 ## After the progress check (not now)
 Phases 8–9 if not done, look-ahead chooser, ML chooser (LightGBM on replay labels), LLM chooser via Ollama (menu-only), attack study (unsafe / warned / menu-only LLM), rule sets B6/B8, one real trace, simple statistics, dashboard polish.
