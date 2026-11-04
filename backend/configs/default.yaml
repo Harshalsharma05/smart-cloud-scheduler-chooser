@@ -18,6 +18,8 @@ cloud:
     - {name: cpu_large, cores: 32, mem_gb: 128, gpus: 0, price_per_h: 32}
     - {name: gpu_1,     cores: 8,  mem_gb: 64,  gpus: 1, price_per_h: 58}
     - {name: highmem,   cores: 16, mem_gb: 512, gpus: 0, price_per_h: 24}
+    - {name: cpu_xlarge, cores: 64, mem_gb: 256, gpus: 0, price_per_h: 64}
+    - {name: gpu_4,      cores: 32, mem_gb: 128, gpus: 4, price_per_h: 232}
 
 burst:
   deadline_margin_s: 600    # DEADLINE_AWARE rents if projected finish > deadline - margin
