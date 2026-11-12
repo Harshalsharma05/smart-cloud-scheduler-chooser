@@ -37,7 +37,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 
 ### Block A: set up and get the data moving (~3 h)
 
-- [ ] **1. [T1] T0 Housekeeping** (0.5-1 h): `.gitignore`, `ml/` skeleton, `ml/.venv` with Python 3.11 + CUDA torch,
+- [x] **1. [T1] T0 Housekeeping** (0.5-1 h): `.gitignore`, `ml/` skeleton, `ml/.venv` with Python 3.11 + CUDA torch,
       `ml/config.py` (TEST_START/TEST_END live here; Track 2 reads them).
 - [ ] **2. [You] Start the Philly download** (`trace-data.tar.gz`, ~1 GB, Git LFS; see ML_PLAN T1 step 1) into
       `data/raw/`. Check ~8 GB free disk. **Unattended**: carry on with step 3 while it downloads.
@@ -149,3 +149,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 
 | Date | Step | Commit | Result |
 |---|---|---|---|
+| 2026-11-12 | 1 (T0) | aad75af | ml/ skeleton, ml/.venv (py3.11, torch 2.14.1+cu126, CUDA OK on GTX 1650), gitignore |
