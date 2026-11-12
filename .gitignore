@@ -6,3 +6,11 @@ node_modules/
 dist/
 results/
 .env
+
+data/
+predictions/
+*.pt
+*.ckpt
+runs/
+ml/.venv/
+ml/results/*.parquet
