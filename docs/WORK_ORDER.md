@@ -44,7 +44,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 - [x] **3. [T2] S0 Housekeeping and freeze** (0.5 h): tag `progress-check-demo`, requirements, folders.
       **S0 applies all CLAUDE.md edits in one go**: Track 2's edits 1-4 *and* Track 1's ML section
       (`docs/track-1/CLAUDE_MD_ML_SECTION.md`), plus the IMPLEMENTATION.md note, so CLAUDE.md is edited only once.
-- [ ] **4. [T2] S1 Flex engine core** (3-4 h, no data needed). Do it while the download finishes.
+- [x] **4. [T2] S1 Flex engine core** (3-4 h, no data needed). Do it while the download finishes.
 
 ### Block B: data and the simple predictors (~8-10 h)
 

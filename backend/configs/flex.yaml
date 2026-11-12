@@ -1,0 +1,13 @@
+# World for the paper simulator (backend/flex). Every number needs "# source: <ref>, accessed <date>" or "# ASSUMPTION".
+# Only the sections phase S1 needs; power, cloud, events etc. are added by later phases.
+
+paths:                  # relative to the repo root
+  data: data            # ASSUMPTION (layout choice, not a number from a source)
+  predictions: predictions
+  results: results
+
+seed: 1                 # ASSUMPTION: default seed for synthetic runs
+check_every: 1000       # ASSUMPTION: full safety check every N events on large runs (tests use 1)
+
+synthetic:              # synthetic test data only, never used for paper numbers
+  pool_gpus: 64         # ASSUMPTION: GPU pool size for synthetic runs (the Philly G comes from the machines table in S8)
