@@ -48,7 +48,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 
 ### Block B: data and the simple predictors (~8-10 h)
 
-- [ ] **5. [T1] T1 Clean the Philly job log** (3-4 h; needs step 2 finished).
+- [x] **5. [T1] T1 Clean the Philly job log** (3-4 h; needs step 2 finished).
       **→ Track 2 chat:** "philly_jobs / attempts / machines parquet ready", plus the T1 report numbers
       (job counts, test window, GPU memory sizes).
 - [ ] **6. [T1] T2 Training examples and time split** (3-4 h).
@@ -150,3 +150,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | Date | Step | Commit | Result |
 |---|---|---|---|
 | 2026-11-12 | 1 (T0) | aad75af | ml/ skeleton, ml/.venv (py3.11, torch 2.14.1+cu126, CUDA OK on GTX 1650), gitignore |
+| 2026-11-12 | 5 (T1) | b16a851 | 117,325 jobs cleaned to 3 parquet tables; job log is UTC (YARN check); test window 27,022 jobs, G = 2,490 |
