@@ -5,6 +5,7 @@ __pycache__/
 node_modules/
 dist/
 results/
+!ml/results/
 .env
 
 data/
