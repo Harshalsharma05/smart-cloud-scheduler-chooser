@@ -9,4 +9,4 @@ A simulator of a computing cluster that can rent cloud machines, used to compare
 - Prompts to paste into Claude Code: [STARTER_PROMPTS.md](STARTER_PROMPTS.md)
 - Long-term research plan (background): `../v0.3/`
 
-Status: skeleton only. See IMPLEMENTATION.md, Phase 0.
+Status: the demo (IMPLEMENTATION.md) is done and frozen; the paper work is planned in `docs/track-1/` and `docs/track-2/`.

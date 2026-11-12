@@ -89,10 +89,11 @@ Commit as "T1: Philly cleaning to shared parquet tables + data report". Stop and
 ## T2: Training examples and time split
 
 ```
-Read CLAUDE.md and docs/track-1/ML_PLAN.md (sections 2 and T2, and contract section 7 in the plan's section 10). Do only phase T2.
+Read CLAUDE.md and docs/track-1/ML_PLAN.md (sections 2 and T2, and contract section 7 in the plan's section 10). Do only phase T2. First commit the updated docs/track-1 files as "docs: T2 validity filter".
 
 Write ml/examples.py:
-- one row per (job, grid point) where e < wall_s, for started, non-censored jobs with submit_time <= TEST_END
+- valid jobs only (started, not censored, wall_s > 0, num_gpus > 0; see the 'Valid job' bullet in ML_PLAN T2), submit_time < TEST_END (half-open); the same filter for history jobs; report valid and excluded counts per split
+- one row per (job, grid point) where e < wall_s
 - t_obs = submit_time if e == 0 else first_start_time + e
 - current-job features, history (per user sorted by end_time, numpy.searchsorted, end_time <= t_obs, last 32, never the job itself) stored as hist_idx (row indices into philly_jobs), and aggregated history features, all as listed in T2
 - split column from submit_time using the dates in ml/config.py

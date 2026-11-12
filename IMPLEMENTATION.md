@@ -1,3 +1,9 @@
+> **Status (Nov 2026): finished and frozen.** This file describes the progress-check demo (phases 0-7 done,
+> git tag `progress-check-demo`). It is **superseded for the paper work**: the CCGrid 2027 simulator and paper follow
+> `docs/track-2/SIM_PLAN.md` and `docs/track-2/PAPER_PLAN.md`; the ML work follows `docs/track-1/ML_PLAN.md`.
+> Phases 8-9 below ("stretch") will not be built. Do not change the demo code (`sim/`, `rules/`, `workloads/`,
+> `eval/`, `api/`, `frontend/`) except for bug fixes.
+
 # Implementation plan: up to the progress check
 
 **Project:** Smart Scheduler Chooser (minor project, PDEU).

@@ -180,7 +180,8 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
 **Goal:** a leak-free example table that every predictor uses.
 
 **`ml/examples.py`:**
-- **Which jobs:** started, not censored, with `submit_time ≤ TEST_END`.
+- **Valid job** (from the T1 report): started (`never_started` false), not `censored`, `wall_s > 0` and `num_gpus > 0`. This drops 194 censored, 22 with `wall_s ≤ 0`, 72 with `num_gpus = 0`, and the never-started jobs. Report valid and excluded counts per split.
+- **Which jobs:** valid jobs with `submit_time < TEST_END` (half-open bounds from `ml/config.py`). The same validity filter applies to history jobs, so jobs killed in the queue do not count toward a user's history or failure rates (see Later).
 - **One row per (job, grid point)**, kept where `e < wall_s` (section 2).
 - **Current-job features** (all known at `t_obs`):
   - `num_gpus`, `vc` (as a category)
@@ -419,6 +420,7 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
 - Calibration of the quantile intervals (split conformal on val) and of the status probabilities (temperature scaling).
 - Proper treatment of censored jobs (survival-style loss) instead of dropping them.
 - Small hyperparameter search (depth 2/4, width 64/128, loss weight).
+- Use never-started jobs (killed or failed in the queue, 4.5% of all jobs, 9% of the test window) as a history signal for the user's failure and cancel rates.
 - Utilisation-based features (needs Track 2's join and careful leakage rules).
 - Predictions at any elapsed time instead of a fixed grid.
 - If `gbdt` and `lightgbm` give nearly identical numbers, keep only one in the paper and say why.

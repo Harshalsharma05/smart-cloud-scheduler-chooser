@@ -3,3 +3,7 @@ uvicorn[standard]
 pydantic
 pyyaml
 pytest
+numpy
+pandas
+pyarrow
+matplotlib
