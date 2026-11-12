@@ -151,4 +151,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 |---|---|---|---|
 | 2026-11-12 | 1 (T0) | aad75af | ml/ skeleton, ml/.venv (py3.11, torch 2.14.1+cu126, CUDA OK on GTX 1650), gitignore |
 | 2026-11-12 | 5 (T1) | b16a851 | 117,325 jobs cleaned to 3 parquet tables; job log is UTC (YARN check); test window 27,022 jobs, G = 2,490 |
-| 2026-11-12 | 3 (S0) | (pending) | tag progress-check-demo (e80be3c); CLAUDE.md merged for both tracks; requirements + flex/traces/paper folders; 4 old tests pass |
+| 2026-11-12 | 3 (S0) | 29e2414 | tag progress-check-demo (e80be3c); CLAUDE.md merged for both tracks; requirements + flex/traces/paper folders; 4 old tests pass |
