@@ -52,7 +52,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
       **→ Track 2 chat:** "philly_jobs / attempts / machines parquet ready", plus the T1 report numbers
       (job counts, test window, GPU memory sizes).
 - [x] **6. [T1] T2 Training examples and time split** (3-4 h).
-- [ ] **7. [T1] T2b Export oracle + last2 and the checker** (1.5-2 h).
+- [x] **7. [T1] T2b Export oracle + last2 and the checker** (1.5-2 h).
       **→ Track 2 chat:** "oracle.csv and last2.csv pass check_predictions.py".
 
 ### Block C: the simulator, part 1 (~10-12 h)
@@ -191,3 +191,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-12 | 3 (S0) | 29e2414 | tag progress-check-demo (e80be3c); CLAUDE.md merged for both tracks; requirements + flex/traces/paper folders; 4 old tests pass |
 | 2026-11-12 | 4 (S1) | e3b5804 | flex engine + safety + synthetic generator; 6 tests pass (4 old + 2 new); 20k synthetic jobs drain in 0.2 s |
 | 2026-11-13 | 6 (T2) | 982d7b9 | ml_examples.parquet 331,896 rows (train 207,717 / val 52,373 / test 71,806); 1.85% empty history; leakage test passes |
+| 2026-11-13 | 7 (T2b) | 23a90dc | oracle.csv 74,728 rows (test 71,806 + 2,922 warm-up), last2.csv 71,806 rows; both pass check_predictions.py |
