@@ -11,3 +11,8 @@ check_every: 1000       # ASSUMPTION: full safety check every N events on large 
 
 synthetic:              # synthetic test data only, never used for paper numbers
   pool_gpus: 64         # ASSUMPTION: GPU pool size for synthetic runs (the Philly G comes from the machines table in S8)
+
+cloud:
+  min_billed_s: 60      # source: docs/track-2/SIM_PLAN.md D8 (per-second billing, 60 s minimum), accessed 2026-11-13
+  max_cloud_gpus: 1000  # source: docs/track-2/SIM_PLAN.md D8 (default cap; sensitivity later), accessed 2026-11-13
+  # price_per_gpu_h, boot_delay_s, migrate_s, restore_s are added in S11 (no value invented here; tests pass their own)

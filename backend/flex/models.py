@@ -28,7 +28,9 @@ class FJob:
     speed: float = 1.0
     version: int = 0            # bumped when a scheduled finish becomes stale
     mark: int = 0               # time of the last state change / work_done update
-    n_starts: int = 0           # starts from QUEUED (must stay <= 1)
+    n_starts: int = 0           # first starts from QUEUED (must stay <= 1)
+    n_suspends: int = 0
+    n_resumes: int = 0
     first_start: int | None = None
     end: int | None = None
     on_cloud: bool = False
