@@ -73,7 +73,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 
 ### Block E: the simulator, part 2 (~10 h, while the transformer trains)
 
-- [ ] **14. [T2] S6 Single-action policies and cost metrics** (4 h).
+- [x] **14. [T2] S6 Single-action policies and cost metrics** (4 h).
 - [ ] **15. [T2] S7 Controller, selectors, experiment runner** (3-4 h). **Pause point P1**: the whole pipeline works
       on synthetic data.
 - [ ] **16. [T2] W0 Paper LaTeX skeleton** (1.5 h). Small; fits here.
@@ -198,3 +198,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 11 (S5) | c7d4142 | flex/predictions.py (contract lookup, oracle fallback, validation); synthetic oracle/last2 writer; real oracle.csv/last2.csv load (25,044 / 24,536 jobs); S4 events now share 10 start times; 14 tests pass |
 | 2026-11-13 | 12 (T3a) | d2e2f38 | 69,702-param transformer; smoke val loss 1.775 -> 1.440; 47 s/epoch on GTX 1650 (30 epochs ~24 min) so T3b runs locally |
 | 2026-11-13 | 13 (T3b) | dc3a1a2 | tf_v1 trained locally (9 epochs, best val loss 1.3243); val pinball 0.440 vs last2 1.003, val status log-loss 0.858 vs 1.206 |
+| 2026-11-13 | 14 (S6) | 366607c | flex/policies.py (delay/cap/burst-only, gating hook on_hold) + D7 cost, waste and user-impact metrics + result row; cloud/cost params in flex.yaml (cloud values ASSUMPTION); 16 tests pass |
