@@ -117,6 +117,43 @@ a phase is blocked. They need about 10 h in total and must be done before step 2
 
 ---
 
+## 2b. End-of-step hand-off (Claude Code does this automatically)
+
+Two Claude Code sessions stay open in VS Code: a **Track 1 session** and a **Track 2 session**. Only one is active at
+a time. So that you never have to work out what comes next, every step ends with a hand-off block.
+
+**When a step's done-check has passed and the work is committed, Claude Code must:**
+1. Tick the step in section 2 (`[x]`) and add a line to the progress log (section 4), in the same commit or a tiny
+   follow-up commit ("work order: step N done").
+2. Find the **next unticked, unblocked step** in section 2 (skip steps marked `[!]`; a `[You]` step is listed as
+   manual work).
+3. Print the report (the track's usual format), then this block **exactly**, filled in:
+
+```
+=== HAND-OFF ===
+DONE: step <N> (<phase>), commit <hash>
+1. REVIEW: paste the report above into the <Track 1 | Track 2> review chat. If it asks for fixes, do them in THIS
+   session first (fixup commit), then continue with 2.
+2. CROSS-TRACK NOTE: <only if step N has a "→" in WORK_ORDER: the one line to paste into the OTHER review chat; else "none">
+3. MANUAL FIRST: <anything you must do by hand before the next step (download, Kaggle upload, writing); else "none">
+4. NEXT: step <M> (<phase>) in the <Track 1 | Track 2> Claude Code session.
+   Paste this into that session:
+   ----
+   Continue with WORK_ORDER step <M> (<phase>). Re-read CLAUDE.md (<ML track | Paper work> section),
+   docs/WORK_ORDER.md and <docs/track-1/ML_PLAN.md | docs/track-2/SIM_PLAN.md (+ PAPER_PLAN.md for W phases)>,
+   then run the <phase> prompt from <docs/track-1/STARTER_PROMPTS_ML.md | docs/track-2/STARTER_PROMPTS_T2.md>.
+   Stop after the done-check, commit, and print the report and the hand-off block.
+   ----
+=== END ===
+```
+
+**Rules for the hand-off:**
+- If the next step is in the same track, the "NEXT" prompt goes into the same session.
+- If the next step is a `[You]` step, say so under MANUAL FIRST and give the step after it as NEXT. Steps 18, 20 and
+  29 need the Track 2 review chat for writing or sourcing.
+- If a step is `[!] blocked`, the hand-off names the blocker and points to the next unblocked step in the other track.
+- Never start the NEXT step yourself. Always stop after printing the block.
+
 ## 3. Load check (honest)
 
 | Block | Claude Code + review (h) | Cumulative |

@@ -250,7 +250,7 @@ Each phase ends with the done-check, a short report, a commit, and a stop. Start
 - **Inputs:** `configs/flex.yaml` (pool size and seed for synthetic runs).
 - **Do:**
   - `flex/models.py`: `FJob(job_id: str, user, submit, gpus, wall_s, status, util, deadline, warmup)` plus runtime fields:
-    - `state` ∈ {QUEUED, RUNNING, SUSPENDED, CLOUD_BOOTING, CLOUD_RUNNING, DONE}
+    - `state` ∈ {PENDING (not yet submitted), QUEUED, RUNNING, SUSPENDED, CLOUD_BOOTING, CLOUD_RUNNING, DONE}
     - `work_done`, `speed`, `version`, `first_start`, `end`, `on_cloud`, `segments` (list of `(start, end, where, speed)`)
   - `flex/engine.py`:
     - The event heap (SUBMIT, FINISH, plus kinds added later) and FCFS skip-ahead (D3).
@@ -279,6 +279,10 @@ Each phase ends with the done-check, a short report, a commit, and a stop. Start
   - `flex/cloud.py` (per-GPU pricing, boot delay, billing, cap; D8).
   - Segments are recorded for every state change.
   - The safety checker learns the cloud rules (billed only READY→RELEASED, one instance per job, a burst job never returns on-prem).
+  - From the S1 review:
+    - Make `Engine.running` a dict `job_id → FJob` (insertion order) instead of a set, and never iterate a set of job ids. Set order of strings changes between Python processes (hash seed), which would make float power sums and greedy tie-breaks non-deterministic.
+    - The `_schedule(new=job)` fast path is only valid when no queued job fits before the submit. Every operation that frees GPUs or changes what may start (finish, suspend, burst, resume, cap or gate change) must call the full `_schedule()`.
+    - Make the work-conservation check real: at finish, `Σ (end − start) × speed` over the job's on-prem and cloud segments must equal `wall_s + extra_work` within `ceil` rounding (at most 1 s × speed per segment).
 - **Done-check (tests):**
   1. A 1-GPU, 10 h job runs at full speed until 1 h, at speed 0.5 from 1 h to 3 h, and at full speed after (cap set at 1 h and removed at 3 h) → it ends at 11 h. The same job suspended from 1 h to 3 h with `restore_s = 0` instead ends at 12 h, and with `restore_s > 0` it ends at `12 h + restore_s`.
   2. A 2-GPU job with 1 h remaining is burst at t: `boot_delay` 300 s, `migrate_s` 120 s, price $3/GPU-h → it ends at `t + 300 + 3600 + 120`, and the bill = 2 × 3 × (3720/3600).
@@ -350,6 +354,7 @@ Each phase ends with the done-check, a short report, a commit, and a stop. Start
   - `traces/philly.py`:
     - Jobs with `submit_time` in the test window become FJobs.
     - Jobs submitted earlier and still running at `TEST_START` become warm-up jobs (`warmup=True`, oracle values, excluded from metrics).
+      The S1 engine can only start jobs from QUEUED. Simplest fix: start the simulation at a warm-up start (for example 7 days before `TEST_START`), submit warm-up jobs at their real `submit_time`, and exclude them from metrics. Decide in S8.
     - Drop `never_started`. Keep `censored` with their observed `wall_s` and count them.
     - Deadlines per D12.
     - `G` from the machine list.

@@ -14,6 +14,13 @@ The only link between the tracks is the interface contract (data/processed/*.par
 
 The progress-check demo (IMPLEMENTATION.md, phases 0-7, git tag `progress-check-demo`) is finished and **frozen**.
 
+## End of every step: hand-off (both tracks)
+Two Claude Code sessions (Track 1, Track 2) stay open; only one is active at a time. The order of steps across tracks
+is `docs/WORK_ORDER.md`. When a step's done-check passes and it is committed: tick the step and log it in
+WORK_ORDER.md, then print the phase report followed by the **HAND-OFF block defined in `docs/WORK_ORDER.md`
+section 2b** (who reviews, cross-track note, manual work, and the exact NEXT prompt and which session to paste it into).
+Then stop. Never start the next step on your own.
+
 ## How to work
 - Do **one phase from IMPLEMENTATION.md at a time**. At the end: run that phase's check, summarise what was built in a few lines, and stop for review.
 - Don't start the next phase or add features that aren't in the current phase.
