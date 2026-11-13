@@ -15,11 +15,21 @@ from examples import utc_epoch  # noqa: E402
 COLS = ["job_id", "elapsed_s", "rt_p10_s", "rt_p50_s", "rt_p90_s", "p_fail", "p_cancel"]
 
 
-def warmup_jobs(jobs, test_start):
-    """Valid jobs (T2 filter) submitted before TEST_START that end after it: running or still queued at TEST_START."""
-    valid = (~jobs["never_started"]) & (~jobs["censored"]) & (jobs["wall_s"].astype("float64") > 0) & (jobs["num_gpus"] > 0)
-    m = valid & (jobs["submit_time"].astype("float64") < test_start) & (jobs["end_time"].astype("float64") > test_start)
+def valid_mask(jobs):
+    """T2 filter: started, not censored, wall_s > 0, num_gpus > 0."""
+    return (~jobs["never_started"]) & (~jobs["censored"]) & (jobs["wall_s"].astype("float64") > 0) & (jobs["num_gpus"] > 0)
+
+
+def export_jobs(jobs):
+    """Valid jobs overlapping [SIM_START, TEST_END): end_time > SIM_START and submit_time < TEST_END."""
+    m = (valid_mask(jobs) & (jobs["end_time"].astype("float64") > utc_epoch(config.SIM_START))
+         & (jobs["submit_time"].astype("float64") < utc_epoch(config.TEST_END)))
     return jobs[m]
+
+
+def export_keys(jobs, ex):
+    """The ml_examples rows (any split) of the export jobs: the key set of every prediction file."""
+    return ex[ex["job_id"].isin(export_jobs(jobs)["job_id"])]
 
 
 def oracle_frame(ex):
@@ -54,24 +64,19 @@ def main():
     ex = pd.read_parquet(config.DATA_PROCESSED / "ml_examples.parquet")
     config.PREDICTIONS.mkdir(parents=True, exist_ok=True)
 
-    test = ex[ex["split"] == "test"]
-    wu = warmup_jobs(jobs, utc_epoch(config.TEST_START))
-    wu_rows = ex[ex["job_id"].isin(wu["job_id"])]
-    oracle = pd.concat([test, wu_rows]).drop_duplicates(["job_id", "elapsed_s"])
+    keys = export_keys(jobs, ex)
 
     fw, ff, fc = train_fallbacks(ex)
-    outs = {"oracle": oracle_frame(oracle), "last2": last2_frame(test, fw, ff, fc)}
+    outs = {"oracle": oracle_frame(keys), "last2": last2_frame(keys, fw, ff, fc)}
     for name, df in outs.items():
         df = df.sort_values(["job_id", "elapsed_s"]).reset_index(drop=True)[COLS]
         df.to_csv(config.PREDICTIONS / f"{name}.csv", index=False)
         print(f"{name}: {len(df):,} rows, {df['job_id'].nunique():,} distinct jobs")
 
-    running = int((wu["first_start_time"].astype("float64") <= utc_epoch(config.TEST_START)).sum())
-    print(f"test: {len(test):,} rows, {test['job_id'].nunique():,} distinct jobs")
-    print(f"warm-up jobs: {len(wu):,} (running at TEST_START {running:,}, queued at TEST_START {len(wu) - running:,}); "
-          f"oracle rows added: {len(oracle) - len(test):,}")
+    print("export rows per split:", keys["split"].value_counts().to_dict())
+    print("export jobs per split:", keys.drop_duplicates("job_id")["split"].value_counts().to_dict())
     print(f"last2 train fallbacks: median wall {fw:.0f} s, fail {ff:.3f}, cancel {fc:.3f}; "
-          f"test rows with empty history: {int((test['hist_count'] == 0).sum())}")
+          f"export rows with empty history: {int((keys['hist_count'] == 0).sum())}")
 
 
 if __name__ == "__main__":

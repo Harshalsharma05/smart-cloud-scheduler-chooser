@@ -1,7 +1,6 @@
 """Shared done-check for every prediction export.
 
 Usage:  python ml/check_predictions.py predictions/last2.csv
-        python ml/check_predictions.py predictions/oracle.csv --allow-extra-keys   (oracle only)
 """
 import sys
 from pathlib import Path
@@ -10,15 +9,12 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402
-from examples import utc_epoch  # noqa: E402
-from export_simple import COLS, warmup_jobs  # noqa: E402
+from export_simple import COLS, export_keys  # noqa: E402
 
 
-def check(path, allow_extra_keys=False):
+def check(path):
     """Return a list of problems (empty = OK)."""
     path = Path(path)
-    if allow_extra_keys and path.stem != "oracle":
-        return ["--allow-extra-keys is only allowed for oracle.csv"]
     probs = []
     df = pd.read_csv(path, dtype={"job_id": str})
     if list(df.columns) != COLS:
@@ -41,20 +37,14 @@ def check(path, allow_extra_keys=False):
         probs.append(f"{int(dup.sum())} duplicate (job_id, elapsed_s) keys")
 
     ex = pd.read_parquet(config.DATA_PROCESSED / "ml_examples.parquet", columns=["job_id", "elapsed_s", "split"])
-    expected = set(map(tuple, ex.loc[ex["split"] == "test", ["job_id", "elapsed_s"]].to_numpy()))
-    extra_ok = set()
-    if allow_extra_keys:
-        jobs = pd.read_parquet(config.DATA_PROCESSED / "philly_jobs.parquet")
-        wu = set(warmup_jobs(jobs, utc_epoch(config.TEST_START))["job_id"])
-        extra_ok = set(map(tuple, ex.loc[ex["job_id"].isin(wu), ["job_id", "elapsed_s"]].to_numpy()))
+    jobs = pd.read_parquet(config.DATA_PROCESSED / "philly_jobs.parquet")
+    expected = set(map(tuple, export_keys(jobs, ex)[["job_id", "elapsed_s"]].to_numpy()))
     got = set(map(tuple, df[["job_id", "elapsed_s"]].to_numpy()))
-    missing, extra = expected - got, got - expected - extra_ok
+    missing, extra = expected - got, got - expected
     if missing:
-        probs.append(f"{len(missing)} expected test keys missing, e.g. {sorted(missing)[:2]}")
+        probs.append(f"{len(missing)} expected export keys missing, e.g. {sorted(missing)[:2]}")
     if extra:
         probs.append(f"{len(extra)} unexpected keys, e.g. {sorted(extra)[:2]}")
-    if allow_extra_keys and not (extra_ok <= got):
-        probs.append(f"{len(extra_ok - got)} warm-up keys missing from oracle")
     return probs
 
 
@@ -62,7 +52,7 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if len(args) != 1:
         sys.exit(__doc__)
-    problems = check(args[0], "--allow-extra-keys" in sys.argv)
+    problems = check(args[0])
     if problems:
         print(f"{args[0]}: {len(problems)} problem(s)")
         for p in problems:

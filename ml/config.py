@@ -19,6 +19,7 @@ VAL_START = "2017-11-01"
 VAL_END = "2017-11-15"       # val: 2017-11-01 to 2017-11-14
 TEST_START = "2017-11-15"
 TEST_END = "2017-12-16"      # test: 2017-11-15 to 2017-12-15
+SIM_START = "2017-11-08"     # Track 2 simulation window is [SIM_START, TEST_END)
 
 SEED = 0
 STATUS_LOSS_WEIGHT = 1.0     # total loss = pinball + weight * CE
