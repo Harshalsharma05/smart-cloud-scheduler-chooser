@@ -84,7 +84,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 - [x] **17b. [T2] S8b Carry-over jobs** (1 h). Inserted after S8: jobs running at epoch0 become pseudo-jobs; baseline validation table.
 - [x] **17c. [T2] S8c Diagnostics** (measurement only; commit bad60fa).
 - [x] **17d. [T2] S8d Carry-over keeps real ids, all-jobs deltas, censored = useful, pred_coverage, tie-breaks.**
-- [ ] **18. [You + Track 2 chat] S11 Parameter sourcing** (1-2 h): the review chat finds and verifies sources; a short
+- [x] **18. [You + Track 2 chat] S11 Parameter sourcing** (1-2 h): the review chat finds and verifies sources; a short
       Claude Code session only edits `configs/flex.yaml` and the parameter table script.
 - [ ] **19. [T2] S12 E1 + E4 on Philly with oracle and last2** (3 h). These are the numbers the abstract may use.
 - [ ] **20. [You] W5 Abstract v1 → submit by 24 Nov AoE** (1 h, with the Track 2 chat). Only numbers that exist.
@@ -208,3 +208,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 17b (S8b) | 1ecadae | 643 carry-over jobs (2,253 GPUs); util 0.655 vs real 0.665; mean wait 0.31 vs 174.7 min (still < half, stopped); validation.csv in results/philly_baseline |
 | 2026-11-13 | 17c (S8c) | bad60fa | diagnostics: burst $40k = 13,317 GPU-h of long Failed jobs billed to failure (no bug); capacity sweep; warm-up-excluded delay cost was the reason delay cost $0 |
 | 2026-11-13 | 17d (S8d) | 50cd35c | carry-over keeps real ids + elapsed0; deltas include warm-up/carry; censored -> Pass; pred_coverage column; (submit, job_id) tie-breaks; 20 tests pass |
+| 2026-11-13 | 18 (S11) | bae65cc | flex.yaml: p_idle 70, PUE 1.58, cloud PUE 1.09, price 3.06, boot 300 sourced; host power, migrate/restore, cap-curve points still ASSUMPTION; paper/tables/params.tex generated |
