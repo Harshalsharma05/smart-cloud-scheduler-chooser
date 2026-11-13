@@ -54,6 +54,8 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 - [x] **6. [T1] T2 Training examples and time split** (3-4 h).
 - [x] **7. [T1] T2b Export oracle + last2 and the checker** (1.5-2 h).
       **→ Track 2 chat:** "oracle.csv and last2.csv pass check_predictions.py".
+- [x] **7b. [T1] T2c Re-export oracle + last2 over all jobs overlapping [SIM_START, TEST_END)** (1.5-2 h).
+      **→ Track 2 chat:** "oracle.csv and last2.csv re-exported (37,262 jobs, 111,451 rows)".
 
 ### Block C: the simulator, part 1 (~10-12 h)
 
@@ -209,3 +211,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 17c (S8c) | bad60fa | diagnostics: burst $40k = 13,317 GPU-h of long Failed jobs billed to failure (no bug); capacity sweep; warm-up-excluded delay cost was the reason delay cost $0 |
 | 2026-11-13 | 17d (S8d) | 50cd35c | carry-over keeps real ids + elapsed0; deltas include warm-up/carry; censored -> Pass; pred_coverage column; (submit, job_id) tie-breaks; 20 tests pass |
 | 2026-11-13 | 18 (S11) | bae65cc | flex.yaml: p_idle 70, PUE 1.58, cloud PUE 1.09, price 3.06, boot 300 sourced; host power, migrate/restore, cap-curve points still ASSUMPTION; paper/tables/params.tex generated |
+| 2026-11-13 | 7b (T2c) | ad2c5f1 | export keys = valid jobs overlapping [2017-11-08, 2017-12-16): 37,262 jobs, 111,451 rows; oracle + last2 pass checker; 4 tests pass |
