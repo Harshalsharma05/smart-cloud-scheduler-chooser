@@ -138,6 +138,7 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
 - **Also write:**
   - `philly_attempts.parquet`.
   - `philly_machines.parquet` (**required**: Track 2 uses it for the GPU pool size). Columns `machine_id` (string), `num_gpus` (int), `gpu_mem_gb` (int, parsed from strings like `" 24GB"`).
+    - num_gpus is derived from the util-file width, because the raw machine list is inconsistent.
 - **Machine-ID check:** report the % of attempt machines (`detail.ip`) that appear in `machine_id`, and give 3 example values from each. Track 2's utilisation join needs the IDs to match. If they don't match, stop and report; don't invent a mapping.
 - **Timezone sanity check (light):**
   - Read only the first ~2M rows of `cluster_gpu_util`.

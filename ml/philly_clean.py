@@ -131,13 +131,58 @@ def build_tables(raw_jobs):
     return jobs_out, att_out.reset_index(drop=True), stats
 
 
-def load_machines(path):
+def util_widths(path):
+    """Per machine: most frequent number of non-empty value fields in cluster_gpu_util (the 8 value columns).
+
+    "NA" counts as present, empty does not. Rows with more than 8 values (DST-hour glitch) are ignored.
+    Returns (machine_id -> width, number of malformed rows ignored)."""
+    counts, bad = {}, 0
+    with open(path, newline="") as f:
+        rd = csv.reader(f)
+        next(rd)
+        for row in rd:
+            if len(row) < 3:
+                continue
+            if any(v != "" for v in row[10:]):
+                bad += 1
+                continue
+            w = sum(v != "" for v in row[2:10])
+            c = counts.setdefault(row[1].strip(), {})
+            c[w] = c.get(w, 0) + 1
+    return {m: max(c, key=c.get) for m, c in counts.items()}, bad
+
+
+def load_machines(path, widths):
+    """Machine table. num_gpus comes from the util-file width (the raw count column is inconsistent);
+    gpu_mem_gb is kept as listed. Also returns the listed counts for the report."""
     m = pd.read_csv(path, skipinitialspace=True)
     m.columns = ["machine_id", "num_gpus", "gpu_mem_gb"]
     m["machine_id"] = m["machine_id"].astype(str).str.strip()
+    m["listed_gpus"] = m["num_gpus"].astype(int)
+    m["num_gpus"] = m["machine_id"].map(widths)
+    missing = m[m["num_gpus"].isna()]["machine_id"].tolist()
+    if missing:
+        raise SystemExit(f"{len(missing)} machines have no util rows, e.g. {missing[:3]}; stopping")
     m["num_gpus"] = m["num_gpus"].astype(int)
     m["gpu_mem_gb"] = m["gpu_mem_gb"].astype(str).str.extract(r"(\d+)")[0].astype(int)
     return m
+
+
+def attempt_gpu_max(attempts):
+    """machine_id -> highest GPU index + 1 seen in attempts (gpu_ids are 'machine:gpuN' pairs)."""
+    pairs = pd.Series(";".join(attempts["gpu_ids"].dropna()).split(";"))
+    pairs = pairs[pairs != ""].str.extract(r"^(.+):gpu(\d+)$").dropna()
+    pairs[1] = pairs[1].astype(int) + 1
+    return pairs.groupby(0)[1].max().to_dict()
+
+
+def check_gpu_counts(machines, attempts):
+    """Every machine's attempt-seen GPU count must be <= derived num_gpus. Returns a stats dict."""
+    seen = attempt_gpu_max(attempts)
+    derived = dict(zip(machines["machine_id"], machines["num_gpus"]))
+    viol = [m for m, k in seen.items() if k > derived.get(m, 0)]
+    return {"violations": len(viol), "violation_examples": viol[:3], "verified_by_attempts": len(seen),
+            "util_width_only": len(machines) - len(seen), "seen": seen}
 
 
 # ------------------------------------------------------------- sanity checks
@@ -228,7 +273,39 @@ def utc_epoch(date_str):
     return int(pd.Timestamp(date_str, tz="UTC").timestamp())
 
 
-def write_report(jobs, attempts, machines, stats, id_check, yarn, util_check, path):
+def machine_report(machines, gc):
+    """Report lines for the machines section (derived vs listed GPU counts)."""
+    m = machines.copy()
+    m["verified"] = m["machine_id"].isin(gc["seen"])
+    g = m.groupby(["num_gpus", "gpu_mem_gb"]).agg(machines=("machine_id", "size")).reset_index()
+    g["total_gpus"] = g["machines"] * g["num_gpus"]
+    lc = m.groupby(["listed_gpus", "num_gpus"]).agg(machines=("machine_id", "size")).reset_index()
+    by = m.groupby("num_gpus").agg(machines=("machine_id", "size"), verified_by_attempts=("verified", "sum")).reset_index()
+    by["util_width_only"] = by["machines"] - by["verified_by_attempts"]
+    n_match = int((m["listed_gpus"] == m["num_gpus"]).sum())
+    noatt = m[~m["verified"]]
+    four = by[by["num_gpus"] == 4].iloc[0]
+    return ["## Machines",
+            "`num_gpus` is **derived from the `cluster_gpu_util` width** (most frequent count of non-empty value columns per machine; "
+            "DST-hour rows with more than 8 values ignored). The raw `cluster_machine_list` GPU count is inconsistent with the util file and with the attempts, so it is not used. "
+            "`gpu_mem_gb` is kept as listed.", "",
+            "### Machines by derived GPU count and listed GPU memory", md_table(g), "",
+            f"- Machines: {len(m)}; **total GPUs (pool size G): {int(m['num_gpus'].sum()):,}**. "
+            "G is a maximum: machines go offline over the trace, so the usable pool is at times smaller.", "",
+            "### Listed vs derived GPU counts (rows = listed count, `num_gpus` = derived)", md_table(lc), "",
+            f"- The listed count equals the derived count on only {n_match} of {len(m)} machines.", "",
+            "### Verification by attempts",
+            f"- For every machine with attempts, max GPU index + 1 in `philly_attempts` <= derived `num_gpus`: "
+            f"**{gc['violations']} violations**.",
+            f"- Machines verified by attempts: {gc['verified_by_attempts']}; relying on util width alone: {gc['util_width_only']} "
+            f"(no attempts in the job log: {len(noatt)}).",
+            md_table(by), "",
+            f"- 4-GPU machines: {int(four['machines'])} in total, {int(four['verified_by_attempts'])} verified by attempts, {int(four['util_width_only'])} not.", "",
+            "- The pairing of GPU memory with GPU count is **unverified**: the paper describes only 2-GPU and 8-GPU server types, "
+            "but the util width shows 4-GPU machines too. GPU model is not named in the trace.", ""]
+
+
+def write_report(jobs, attempts, machines, stats, id_check, yarn, util_check, gpu_check, path):
     n = len(jobs)
     L = ["# T1 data report (Philly job log)", ""]
     L += ["## Counts", f"- Jobs: {n:,} (README says 117,325)",
@@ -279,11 +356,7 @@ def write_report(jobs, attempts, machines, stats, id_check, yarn, util_check, pa
     tw = jobs[(st >= utc_epoch(config.TEST_START)) & (st < utc_epoch(config.TEST_END))]
     L += [f"- Test-window jobs censored: {int(tw['censored'].sum()):,} of {len(tw):,} ({100*tw['censored'].mean():.2f}%); "
           f"never started: {int(tw['never_started'].sum()):,}", ""]
-    gm = machines.groupby(["gpu_mem_gb", "num_gpus"]).agg(machines=("machine_id", "size")).reset_index()
-    gm["total_gpus"] = gm["machines"] * gm["num_gpus"]
-    L += ["## Machines", md_table(gm), "",
-          f"- Machines: {len(machines)}; **total GPUs (pool size G): {int(machines['num_gpus'].sum()):,}**",
-          "- GPU model is not named in the trace; only memory size (12 GB / 24 GB) is known.", ""]
+    L += machine_report(machines, gpu_check)
     L += ["## Machine-ID check (attempt `detail.ip` vs machine list `machineId`)",
           f"- Distinct attempt machines: {id_check['n_attempt_machines']}; found in machine list: **{id_check['pct_found']:.2f}%**",
           f"- Examples from attempts: {id_check['attempt_examples']}",
@@ -306,7 +379,7 @@ def write_report(jobs, attempts, machines, stats, id_check, yarn, util_check, pa
           f"{stats['attempts_end_before_start']} attempts have `end < start`. "
           f"Jobs with `wall_s <= 0`: {int((started0['wall_s'].dropna() <= 0).sum())}. T2 excludes jobs with `wall_s <= 0` or `num_gpus = 0`.",
           f"- Test-window never-started jobs: {int(tw['never_started'].sum()):,} of {len(tw):,}.",
-          f"- Total GPU pool G = {int(machines['num_gpus'].sum()):,}.", ""]
+          f"- Total GPU pool G = {int(machines['num_gpus'].sum()):,} (derived from util width; a maximum).", ""]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(L), encoding="utf-8")
 
@@ -319,11 +392,18 @@ def main():
           "| missing end example:", next((a["end_time"] for j in raw for a in j["attempts"] if a["end_time"] is None), None))
     jobs, attempts, stats = build_tables(raw)
     # to_epoch stats were accumulated inside build_tables
-    machines = load_machines(TRACE_DIR / "cluster_machine_list")
+    widths, bad_rows = util_widths(TRACE_DIR / "cluster_gpu_util")
+    print(f"util widths for {len(widths)} machines; malformed rows ignored: {bad_rows:,}")
+    machines = load_machines(TRACE_DIR / "cluster_machine_list", widths)
     jobs.to_parquet(config.DATA_PROCESSED / "philly_jobs.parquet", index=False)
     attempts.to_parquet(config.DATA_PROCESSED / "philly_attempts.parquet", index=False)
-    machines.to_parquet(config.DATA_PROCESSED / "philly_machines.parquet", index=False)
+    machines[["machine_id", "num_gpus", "gpu_mem_gb"]].to_parquet(config.DATA_PROCESSED / "philly_machines.parquet", index=False)
     print(f"jobs {len(jobs):,}  attempts {len(attempts):,}  machines {len(machines)}")
+    gpu_check = check_gpu_counts(machines, attempts)
+    print({k: v for k, v in gpu_check.items() if k != "seen"}, f"| G = {int(machines['num_gpus'].sum()):,}")
+    if gpu_check["violations"] > 0:
+        print("GPU COUNT VIOLATIONS - stopping.")
+        sys.exit(1)
     id_check = machine_id_check(attempts, machines)
     print("machine-id check:", id_check)
     if id_check["pct_found"] < 99.0:
@@ -333,7 +413,7 @@ def main():
     print("YARN check:", *yarn, sep="\n  ")
     util_check = timezone_check(attempts)
     print("timezone check:", util_check)
-    write_report(jobs, attempts, machines, stats, id_check, yarn, util_check,
+    write_report(jobs, attempts, machines, stats, id_check, yarn, util_check, gpu_check,
                  config.REPORTS / "T1_data_report.md")
     print("wrote", config.REPORTS / "T1_data_report.md")
 

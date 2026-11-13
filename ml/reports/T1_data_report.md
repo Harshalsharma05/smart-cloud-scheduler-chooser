@@ -82,13 +82,42 @@ Job IDs are `application_<RM start, ms since epoch (UTC)>_<seq>`. For each resou
 - Test-window jobs censored: 7 of 27,022 (0.03%); never started: 2,457
 
 ## Machines
-| gpu_mem_gb | num_gpus | machines | total_gpus |
-|---|---|---|---|
-| 12 | 2 | 321 | 642 |
-| 24 | 8 | 231 | 1848 |
+`num_gpus` is **derived from the `cluster_gpu_util` width** (most frequent count of non-empty value columns per machine; DST-hour rows with more than 8 values ignored). The raw `cluster_machine_list` GPU count is inconsistent with the util file and with the attempts, so it is not used. `gpu_mem_gb` is kept as listed.
 
-- Machines: 552; **total GPUs (pool size G): 2,490**
-- GPU model is not named in the trace; only memory size (12 GB / 24 GB) is known.
+### Machines by derived GPU count and listed GPU memory
+| num_gpus | gpu_mem_gb | machines | total_gpus |
+|---|---|---|---|
+| 2 | 24 | 150 | 300 |
+| 4 | 12 | 83 | 332 |
+| 4 | 24 | 73 | 292 |
+| 8 | 12 | 238 | 1904 |
+| 8 | 24 | 8 | 64 |
+
+- Machines: 552; **total GPUs (pool size G): 2,892**. G is a maximum: machines go offline over the trace, so the usable pool is at times smaller.
+
+### Listed vs derived GPU counts (rows = listed count, `num_gpus` = derived)
+| listed_gpus | num_gpus | machines |
+|---|---|---|
+| 2 | 4 | 83 |
+| 2 | 8 | 238 |
+| 8 | 2 | 150 |
+| 8 | 4 | 73 |
+| 8 | 8 | 8 |
+
+- The listed count equals the derived count on only 8 of 552 machines.
+
+### Verification by attempts
+- For every machine with attempts, max GPU index + 1 in `philly_attempts` <= derived `num_gpus`: **0 violations**.
+- Machines verified by attempts: 415; relying on util width alone: 137 (no attempts in the job log: 137).
+| num_gpus | machines | verified_by_attempts | util_width_only |
+|---|---|---|---|
+| 2 | 150 | 148 | 2 |
+| 4 | 156 | 24 | 132 |
+| 8 | 246 | 243 | 3 |
+
+- 4-GPU machines: 156 in total, 24 verified by attempts, 132 not.
+
+- The pairing of GPU memory with GPU count is **unverified**: the paper describes only 2-GPU and 8-GPU server types, but the util width shows 4-GPU machines too. GPU model is not named in the trace.
 
 ## Machine-ID check (attempt `detail.ip` vs machine list `machineId`)
 - Distinct attempt machines: 415; found in machine list: **100.00%**
@@ -110,4 +139,4 @@ Job IDs are `application_<RM start, ms since epoch (UTC)>_<seq>`. For each resou
 - Censored jobs have null `end_time` and `wall_s`.
 - 76 started jobs have `num_gpus = 0` (attempt without GPU detail); 4 attempts have `end < start`. Jobs with `wall_s <= 0`: 22. T2 excludes jobs with `wall_s <= 0` or `num_gpus = 0`.
 - Test-window never-started jobs: 2,457 of 27,022.
-- Total GPU pool G = 2,490.
+- Total GPU pool G = 2,892 (derived from util width; a maximum).

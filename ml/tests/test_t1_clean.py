@@ -50,3 +50,14 @@ def test_four_cases():
     assert len(att[att.job_id == "j_nostart"]) == 1
 
     assert len(jobs) == 4 and all(isinstance(x, str) for x in jobs.job_id)
+
+
+def test_util_widths(tmp_path):
+    """2-wide and 8-wide machines are read; the malformed 16-wide row is ignored; 'NA' counts as present."""
+    hdr = "time,machineId," + ",".join(f"gpu{i}_util" for i in range(8)) + "\n"
+    rows = ["t1,a,1.0,2.0,,,,,,,", "t2,a,1.0,NA,,,,,,,",
+            "t3,b," + ",".join(["5.0"] * 8) + ",", "t4,b," + ",".join(["5.0"] * 14) + ","]
+    f = tmp_path / "util.csv"
+    f.write_text(hdr + "\n".join(rows) + "\n")
+    w, bad = pc.util_widths(f)
+    assert w == {"a": 2, "b": 8} and bad == 1
