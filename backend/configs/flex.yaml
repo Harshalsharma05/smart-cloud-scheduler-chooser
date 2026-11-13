@@ -1,5 +1,5 @@
 # World for the paper simulator (backend/flex). Every number needs "# source: <ref>, accessed <date>" or "# ASSUMPTION".
-# Sections are added phase by phase (S1 paths and seed, S3 power, S4 grid, S6 cloud and cost, S7 deadlines).
+# Sections are added phase by phase (S1 paths and seed, S3 power, S4 grid, S6 cloud and cost, S7 deadlines, S11 sources).
 
 paths:                  # relative to the repo root
   data: data            # ASSUMPTION (layout choice, not a number from a source)
@@ -17,27 +17,29 @@ synthetic:              # synthetic test data only, never used for paper numbers
 cloud:
   min_billed_s: 60      # source: docs/track-2/SIM_PLAN.md D8 (per-second billing, 60 s minimum), accessed 2026-11-13
   max_cloud_gpus: 1000  # source: docs/track-2/SIM_PLAN.md D8 (default cap; sensitivity later), accessed 2026-11-13
-  price_per_gpu_h: 3.0  # ASSUMPTION - replace in S11 (USD per GPU-hour)
-  boot_delay_s: 300     # ASSUMPTION - replace in S11 (request -> READY)
-  migrate_s: 120        # ASSUMPTION - replace in S11 (extra work when a running job moves to the cloud)
-  restore_s: 60         # ASSUMPTION - replace in S11 (extra work when a suspended job resumes)
+  price_per_gpu_h: 3.06 # source: AWS EC2 p3.2xlarge (1 V100) on-demand us-east-1 $3.06/h, read on instances.vantage.sh/aws/ec2/p3.2xlarge (last updated 2026-11-13); confirm on the AWS pricing page before citing. Spot $0.43/h is covered by the E2 price sweep. Accessed 2026-11-13
+  boot_delay_s: 300     # source: Mao and Humphrey, IEEE CLOUD 2012, pp. 423-430: VM startup 96.9 s (EC2 Linux), 357-406 s (Azure); 300 s is inside that range plus container/data setup. E2 sweeps 60-900 s. Accessed 2026-11-13
+  migrate_s: 120        # ASSUMPTION, bounded by CheckFreq (USENIX FAST 2021) Table 3 (checkpoint stall 3.6 s V100/SSD, 10.7 s 1080Ti/HDD for VGG16; checkpoint sizes 90 MB-5 GB). Includes save, transfer, load and warm-up for <= 1 GB.
+  restore_s: 60         # ASSUMPTION, same basis as migrate_s
 
-power:                    # one representative GPU type (D5); every value is a placeholder until S11
-  p_idle_w: 50            # ASSUMPTION - replace in S11 (one GPU, idle, W)
-  p_max_w: 250            # ASSUMPTION - replace in S11 (one GPU at full load, W)
-  h_idle_w: 100           # ASSUMPTION - replace in S11 (host power per installed GPU, always on, W)
-  h_busy_w: 50            # ASSUMPTION - replace in S11 (extra host power per busy GPU, W)
-  pue: 1.3                # ASSUMPTION - replace in S11 (on-prem facility)
-  cloud_pue: 1.2          # ASSUMPTION - replace in S11 (cloud facility, used only for E5 carbon)
+power:                    # one representative GPU type (D5)
+  p_idle_w: 70            # source: Zeus (NSDI 2023) Sec 2.3, measured V100 idle about 70 W (a V100, not Pascal; sensitivity 40-70 W), accessed 2026-11-13
+  p_max_w: 250            # source: NVIDIA Tesla P100 PCIe datasheet (250 W max, 12 GB and 16 GB variants; the trace names no GPU model, only 12/24 GB); Tesla M40 datasheet also 250 W. URL: https://nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-p100/pdf/nvidia-tesla-p100-PCIe-datasheet.pdf, accessed 2026-11-13
+  h_idle_w: 100           # ASSUMPTION (no verified source; sensitivity +-50%)
+  h_busy_w: 50            # ASSUMPTION (no verified source; sensitivity +-50%)
+  pue: 1.58               # source: Uptime Institute Global Data Center Survey 2023, industry average per site 1.58 (1.47 weighted by IT capacity; sensitivity 1.3-1.6). URL: https://journal.uptimeinstitute.com/large-data-centers-are-mostly-more-efficient-analysis-confirms/, accessed 2026-11-13
+  cloud_pue: 1.09         # source: Google datacenters.google/efficiency, fleet-wide average PUE 1.09 for 2025 (E5 only). URL: https://www.datacenters.google/efficiency, accessed 2026-11-13
 
 cap_curve:                # speed as a function of r = f * P_max / P_uncapped(u), piecewise linear (D9); r >= 1 means speed 1
-  variant: optimistic     # ASSUMPTION - replace in S11 (which curve is the default)
-  optimistic:             # ASSUMPTION - replace in S11 ([r, speed] points; Zeus / Patel et al. to be read in S11)
+  variant: optimistic     # keep: favours capping, so it is the conservative choice for the claim that burst can win; pessimistic is shown in T4
+  # Anchor point from Patel et al. (ASPLOS 2024) Sec 4.1, A100 training: about 22% less server power for about 10% slower, i.e. r about 0.78, speed about 0.90, between our two curves. The curve points themselves stay ASSUMPTION (not taken from a paper).
+  optimistic:             # ASSUMPTION ([r, speed] points)
     - [0.3, 0.55]
     - [0.5, 0.80]
     - [0.7, 0.93]
     - [1.0, 1.0]
-  pessimistic:            # ASSUMPTION - replace in S11
+  # Anchor point from Patel et al. (ASPLOS 2024) Sec 4.1, A100 training: about 22% less server power for about 10% slower, i.e. r about 0.78, speed about 0.90, between our two curves. The curve points themselves stay ASSUMPTION (not taken from a paper).
+  pessimistic:            # ASSUMPTION ([r, speed] points)
     - [0.3, 0.30]
     - [0.5, 0.55]
     - [0.7, 0.80]
