@@ -66,7 +66,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 
 - [x] **12. [T1] T3a Transformer code + smoke run on the GTX 1650** (4-6 h). Its report says whether full
       training fits locally (< ~1.5 h) or needs Kaggle.
-- [ ] **13. [T1] T3b Start the full training run** (~1 h of your time: local run, or upload to Kaggle per
+- [x] **13. [T1] T3b Start the full training run** (~1 h of your time: local run, or upload to Kaggle per
       `ml/KAGGLE.md`). **Unattended**: once it is running, go straight to step 14.
       Finish T3b (download the checkpoint, print the validation numbers, commit) whenever training ends, even if that
       is between later Track 2 steps. That is the only allowed "interrupt", and it is a short session.
@@ -197,3 +197,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 10 (S4) | ca39926 | flex/grid.py (D13 events, LA local time), metrics.py (D6 shed metrics), paired.py (snapshots, run_base/run_event/run_pair, gate D10), engine admit hook + truncate_arrivals; 12 tests pass |
 | 2026-11-13 | 11 (S5) | c7d4142 | flex/predictions.py (contract lookup, oracle fallback, validation); synthetic oracle/last2 writer; real oracle.csv/last2.csv load (25,044 / 24,536 jobs); S4 events now share 10 start times; 14 tests pass |
 | 2026-11-13 | 12 (T3a) | d2e2f38 | 69,702-param transformer; smoke val loss 1.775 -> 1.440; 47 s/epoch on GTX 1650 (30 epochs ~24 min) so T3b runs locally |
+| 2026-11-13 | 13 (T3b) | dc3a1a2 | tf_v1 trained locally (9 epochs, best val loss 1.3243); val pinball 0.440 vs last2 1.003, val status log-loss 0.858 vs 1.206 |
