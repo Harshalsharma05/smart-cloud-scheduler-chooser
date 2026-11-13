@@ -7,6 +7,11 @@ Decisions (S8):
 - Warm-up: every job with submit in [epoch0, TEST_END) is loaded; those with submit < TEST_START get warmup=True
   (no deadline, excluded from metrics). Jobs submitted before epoch0 are ignored (counted and reported).
   Warm-up jobs and censored jobs have no prediction rows, so predictors fall back to oracle values (counted).
+- Carry-over (S8b): a job with first_start < epoch0 < end is a pseudo-job "#carry:<job_id>" submitted at t = 0 with
+  wall_s = end - epoch0 (end = first_start + wall_s; trace end for censored jobs), warmup=True, carry=True. Its id sorts
+  before every real id, so it starts at t = 0 before any other job. If the carry-overs exceed G, the latest-started
+  ones are dropped (counted). The pseudo id has no prediction rows, so predictors use oracle values for it.
+  Jobs submitted before epoch0 that start after epoch0 are still ignored (counted, not simulated).
 - Dropped: never_started jobs, jobs with 0 GPUs, jobs with wall_s <= 0 (all counted in the report).
   Censored jobs (no end) are kept with wall_s = (last end_time in the log) - first_start_time.
 - Deadlines: D12, only for test-window jobs, drawn in (submit, job_id) order from Random(seed + 1).
@@ -18,6 +23,7 @@ import random
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from flex.grid import epoch_from_iso, generate_events
@@ -76,16 +82,30 @@ def load_philly(cfg=None):
     # jobs submitted before epoch0 are ignored; say how many were still running then
     before = d[d["submit_time"] < epoch0]
     end_abs = before["first_start_time"] + before["wall_s"]
-    running = before[(before["first_start_time"] <= epoch0) & (end_abs > epoch0)]
-    rep["before_epoch0_ignored"] = len(before)
-    rep["before_epoch0_running"] = len(running)
-    rep["before_epoch0_running_gpus"] = int(running["num_gpus"].sum())
-    rep["before_epoch0_remaining_gt_14d"] = int((end_abs[running.index] - epoch0 > 14 * 86400).sum())
+    running = before[(before["first_start_time"] < epoch0) & (end_abs > epoch0)].copy()
+    rep["before_epoch0_total"] = len(before)
+    rep["before_epoch0_queued_at_epoch0_ignored"] = int((before["first_start_time"] >= epoch0).sum())
+    rep["carry_candidates"] = len(running)
+    rep["carry_candidates_gpus"] = int(running["num_gpus"].sum())
+    rep["carry_remaining_gt_14d"] = int((end_abs[running.index] - epoch0 > 14 * 86400).sum())
+    running["remaining"] = (end_abs[running.index] - epoch0).astype(int)
+    carry, used = [], 0
+    for r in running.sort_values(["first_start_time", "job_id"]).itertuples(index=False):
+        if used + r.num_gpus > G:
+            continue
+        used += int(r.num_gpus)
+        carry.append(FJob(job_id=f"#carry:{r.job_id}", user=r.user, submit=0, gpus=int(r.num_gpus), wall_s=int(r.remaining),
+                          status=r.status, util=float(cfg["philly"]["util_default"]), warmup=True, carry=True))
+    rep["carry_jobs"] = len(carry)
+    rep["carry_gpus"] = used
+    rep["carry_truncated"] = len(running) - len(carry)
 
     d = d[(d["submit_time"] >= epoch0) & (d["submit_time"] < test_end_utc)].sort_values(["submit_time", "job_id"])
     util_path = data / "philly_job_util.parquet"
+    umap = {}
     if util_path.exists():
         u = pd.read_parquet(util_path).set_index("job_id")["gpu_util_mean"]
+        umap = u.to_dict()
         util = d["job_id"].map(u).fillna(cfg["philly"]["util_default"]).astype(float).tolist()
         util_source = (f"philly_job_util.parquet ({int(d['job_id'].isin(u.index).sum())} of {len(d)} jobs measured, "
                        f"rest util_default)")
@@ -96,15 +116,59 @@ def load_philly(cfg=None):
     jobs = [FJob(job_id=r.job_id, user=r.user, submit=int(r.submit_time - epoch0), gpus=int(r.num_gpus),
                  wall_s=int(r.wall_s), status=r.status, util=float(u_), warmup=bool(r.submit_time < test_start_utc))
             for r, u_ in zip(d.itertuples(index=False), util)]
+    for c in carry:                                         # carry-overs use the measured util too (when it exists)
+        c.util = float(umap.get(c.job_id.removeprefix("#carry:"), c.util))
+    jobs = carry + jobs
     test_jobs = [j for j in jobs if not j.warmup]
     assign_deadlines(test_jobs, random.Random(cfg["seed"] + 1), cfg["deadlines"])    # already in (submit, job_id) order
 
     test_start, test_end = test_start_utc - epoch0, test_end_utc - epoch0
     events = generate_events(random.Random(cfg["seed"]), epoch0, test_start, test_end, cfg["grid"])
-    rep.update(jobs=len(jobs), warmup_jobs=len(jobs) - len(test_jobs), test_jobs=len(test_jobs), G=G)
+    rep.update(jobs=len(jobs), warmup_jobs=len(jobs) - len(test_jobs) - len(carry), carry_pseudo_jobs=len(carry),
+               test_jobs=len(test_jobs), G=G)
     real = d.set_index("job_id")[["first_start_time", "run_s", "censored"]]       # real timings, for sanity checks only
-    return dict(jobs=jobs, G=G, epoch0=epoch0, test_start=test_start, test_end=test_end, events=events,
+    all_started = raw[~raw["never_started"] & (raw["num_gpus"] > 0)]          # for the real busy-GPU curve
+    return dict(jobs=jobs, G=G, epoch0=epoch0, test_start_utc=test_start_utc, test_end_utc=test_end_utc, all_started=all_started,
+                last_end=last_end, test_start=test_start, test_end=test_end, events=events,
                 util_source=util_source, report=rep, real=real)
+
+
+def _busy_per_minute(starts, ends, gpus, w0, w1):
+    """GPUs busy at every minute boundary of [w0, w1) from (start, end, gpus) triples (same time origin as w0, w1)."""
+    n = (w1 - w0 + 59) // 60
+    diff = np.zeros(n + 1)
+    lo = np.clip(np.ceil((np.asarray(starts, dtype=float) - w0) / 60.0), 0, n).astype(int)
+    hi = np.clip(np.ceil((np.asarray(ends, dtype=float) - w0) / 60.0), 0, n).astype(int)
+    np.add.at(diff, lo, gpus)
+    np.add.at(diff, hi, -np.asarray(gpus, dtype=float))
+    return np.cumsum(diff)[:n]
+
+
+def validation(L, eng, out_dir=None):
+    """Baseline (simulated) vs real, test window: busy GPUs (mean, p95) and wait (mean, p50, p90, share > 60 s).
+    Real busy GPUs use first_start_time and end_time of ALL started jobs (censored: trace end); waits use the kept test jobs."""
+    ts, te, e0 = L["test_start"], L["test_end"], L["epoch0"]
+    a = L["all_started"]
+    end = a["end_time"].fillna(L["last_end"]).astype(float)
+    real_busy = _busy_per_minute(a["first_start_time"].astype(float), end, a["num_gpus"].to_numpy(),
+                                 L["test_start_utc"], L["test_end_utc"])
+    segs = [(s_, e_, j.gpus) for j in eng.jobs.values() for s_, e_, where, _ in j.segments if where == "onprem"]
+    sim_busy = _busy_per_minute([x[0] for x in segs], [x[1] for x in segs], [x[2] for x in segs], ts, te)
+    test = [j for j in eng.jobs.values() if not j.warmup]
+    rw = np.array([L["real"].loc[j.job_id, "first_start_time"] - (j.submit + e0) for j in test], dtype=float)
+    sw = np.array([j.first_start - j.submit for j in test], dtype=float)
+    rows = [("busy_gpus_mean", real_busy.mean(), sim_busy.mean()), ("busy_gpus_p95", np.percentile(real_busy, 95), np.percentile(sim_busy, 95)),
+            ("utilisation_mean", real_busy.mean() / L["G"], sim_busy.mean() / L["G"]),
+            ("wait_mean_min", rw.mean() / 60, sw.mean() / 60), ("wait_p50_min", np.percentile(rw, 50) / 60, np.percentile(sw, 50) / 60),
+            ("wait_p90_min", np.percentile(rw, 90) / 60, np.percentile(sw, 90) / 60),
+            ("frac_wait_gt_60s", (rw > 60).mean(), (sw > 60).mean())]
+    df = pd.DataFrame(rows, columns=["metric", "real", "simulated"]).round(3)
+    print(f"baseline validation, test window ({len(test)} jobs; G = {L['G']}):")
+    print(df.to_string(index=False))
+    out = Path(out_dir) if out_dir else ROOT / "results" / "philly_baseline"
+    out.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out / "validation.csv", index=False)
+    return df
 
 
 def main():
@@ -136,20 +200,12 @@ def main():
     run_s = time.perf_counter() - t0
     print(f"baseline run: {len(jobs)} jobs, {eng.n_events} events, run time {run_s:.1f} s, drained at day {eng.now / 86400:.1f}")
 
+    validation(L, eng)
     test = [j for j in eng.jobs.values() if not j.warmup]
     real = L["real"]
     nc = [j for j in test if not real.loc[j.job_id, "censored"]]
     share = sum(j.wall_s > 1.1 * real.loc[j.job_id, "run_s"] for j in nc) / len(nc)
     print(f"share of non-censored test jobs with wall_s > 1.1 x run_s: {share:.3f} ({len(nc)} jobs)")
-    real_wait = sum(real.loc[j.job_id, "first_start_time"] - (j.submit + L["epoch0"]) for j in test) / len(test)
-    sim_wait = sum(j.first_start - j.submit for j in test) / len(test)
-    print(f"mean wait of test jobs: real {real_wait / 60:.1f} min, simulated {sim_wait / 60:.1f} min")
-    busy = 0
-    for j in eng.jobs.values():
-        for s, e, where, _ in j.segments:
-            if where == "onprem":
-                busy += j.gpus * max(0, min(e, te) - max(s, ts))
-    print(f"baseline mean GPU utilisation in the window: {busy / G / (te - ts):.3f}")
     pcs = tracker.pieces(ts, te)
     print(f"facility power in the window: mean {tracker.mean_kw(ts, te):.0f} kW, peak {max(p for _, p in pcs):.0f} kW")
     for name in ("oracle", "last2"):
@@ -173,7 +229,9 @@ def main():
         t0 = time.perf_counter()
         row = run_policy(snap, ev, name, world, "oracle", "predictor", cfg["seed"], base)
         print(f"  {name}: {time.perf_counter() - t0:.1f} s  (shed {row['shed_mwh']:.3f} MWh, "
-              f"compliance {row['compliance']:.2f}, $/MWh {row['usd_per_mwh']})")
+              f"compliance {row['compliance']:.2f}, $/MWh {row['usd_per_mwh']}, cost ${row['cost_usd']:.0f}, "
+              f"cloud ${row['cloud_usd']:.0f}, dGPUh_good {row['dgpuh_good']:.1f}, missed {row['missed_deadlines']}, "
+              f"suspended {row['n_suspended']}, burst {row['n_burst']})")
 
 
 if __name__ == "__main__":

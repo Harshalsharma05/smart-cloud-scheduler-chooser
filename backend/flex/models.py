@@ -21,6 +21,7 @@ class FJob:
     util: float = 0.5           # mean GPU utilisation, 0..1
     deadline: int | None = None
     warmup: bool = False
+    carry: bool = False         # S8b: already running at the simulation start (pseudo-job submitted at t = 0)
     # runtime fields
     state: str = PENDING
     work_done: float = 0.0      # nominal seconds of progress (valid as of `mark`)
