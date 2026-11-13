@@ -47,6 +47,11 @@ def power_kw(engine, params):
     return params.pue * total_w / 1000.0
 
 
+def start_delta_kw(params, job, f=1.0):
+    """Extra facility power (kW) if `job` starts now: its GPUs go from idle to busy, plus host busy power (D10)."""
+    return params.pue * job.gpus * (gpu_power_w(params, job.util, f) - params.p_idle_w + params.h_busy_w) / 1000.0
+
+
 def interp(curve, r):
     """Piecewise-linear speed at ratio r; clamped to the end points."""
     if r <= curve[0][0]:
@@ -92,23 +97,27 @@ class PowerTracker:
             raise ValueError(f"no power recorded at or before t={t}")
         return self.steps[i][1]
 
-    def energy_kwh(self, t0, t1):
-        """Exact integral of power over [t0, t1]; the last step is held up to t1."""
+    def pieces(self, t0, t1):
+        """(dt, kW) pieces covering [t0, t1]; the last step is held up to t1."""
         if t1 <= t0:
-            return 0.0
+            return []
         i = max(bisect.bisect_right(self.steps, (t0, float("inf"))) - 1, 0)
         if self.steps[i][0] > t0:
             raise ValueError(f"no power recorded at t={t0}")
-        total, n = 0.0, len(self.steps)
+        out, n = [], len(self.steps)
         while i < n:
             start = max(self.steps[i][0], t0)
             end = min(self.steps[i + 1][0], t1) if i + 1 < n else t1
             if end > start:
-                total += self.steps[i][1] * (end - start)
+                out.append((end - start, self.steps[i][1]))
             if end >= t1:
                 break
             i += 1
-        return total / 3600.0
+        return out
+
+    def energy_kwh(self, t0, t1):
+        """Exact integral of power over [t0, t1]."""
+        return sum(dt * p for dt, p in self.pieces(t0, t1)) / 3600.0
 
     def mean_kw(self, t0, t1):
         return self.energy_kwh(t0, t1) * 3600.0 / (t1 - t0)

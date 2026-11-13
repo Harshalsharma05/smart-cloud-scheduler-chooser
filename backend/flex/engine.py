@@ -34,6 +34,7 @@ class Engine:
         self.check_every, self.on_event = check_every, on_event
         self.cloud = cloud
         self.cap_f, self.speed_fn = 1.0, None   # cluster-wide power cap level and its speed function
+        self.admit = None            # optional gate: admit(job) -> bool, asked before every on-prem start (D10)
         for j in sorted(jobs, key=lambda j: (j.submit, j.job_id)):
             self._push(j.submit, SUBMIT, j.job_id, 0)
 
@@ -117,7 +118,7 @@ class Engine:
         if not self.queue or self.free < min(self._qsizes):
             return
         if new is not None:          # the queue was stable before `new`, so only `new` can start
-            if new.gpus <= self.free:
+            if new.gpus <= self.free and (self.admit is None or self.admit(new)):
                 self.queue.pop()
                 self._start(new)
             return
@@ -126,11 +127,27 @@ class Engine:
             if self.free == 0:
                 rest.extend(self.queue[i:])
                 break
-            if j.gpus <= self.free:
+            if j.gpus <= self.free and (self.admit is None or self.admit(j)):
                 self._start(j)
             else:
                 rest.append(j)
         self.queue = rest
+
+    def schedule(self):
+        """Full scheduling pass, e.g. when the gate turns off."""
+        self._schedule()
+        self._notify()
+
+    def truncate_arrivals(self, t_stop):
+        """Drop every job whose SUBMIT is still pending after t_stop (D6 horizon rule)."""
+        keep = []
+        for item in self.heap:
+            if item[1] == SUBMIT and item[0] > t_stop:
+                del self.jobs[item[3]]
+            else:
+                keep.append(item)
+        heapq.heapify(keep)
+        self.heap = keep
 
     def _dequeue_size(self, job):
         self._qsizes[job.gpus] -= 1

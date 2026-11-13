@@ -1,9 +1,12 @@
 """Tests for the paper engine (backend/flex)."""
+import datetime as dt
 import random
 
 from flex.cloud import Cloud, CloudParams, total_cost
 from flex.engine import Engine
+from flex.grid import Event, epoch_from_iso, generate_events, local_epoch, local_hour, to_local
 from flex.models import FJob, load_config
+from flex.paired import baseline_snapshots, policy_none, run_pair
 from flex.power import PowerParams, PowerTracker, make_speed_fn, params_from_config, power_kw
 from traces.synthetic import generate
 
@@ -118,3 +121,44 @@ def test_energy_is_sum_of_steps_on_a_synthetic_day():
     assert abs(tracker.energy_kwh(0, mid) + tracker.energy_kwh(mid, steps[-1][0]) - by_hand) < 1e-9
     # final state is an empty cluster: idle floor only
     assert abs(steps[-1][1] - power_kw(eng, pp)) < 1e-12
+
+
+def test_paired_none_policy_with_zero_cut_changes_nothing():
+    cfg = load_config()
+    pp = params_from_config(cfg)
+    epoch0 = epoch_from_iso(cfg["synthetic"]["epoch0_utc"])
+    jobs = generate(random.Random(cfg["seed"]), days=4)
+    base_engine = Engine(jobs, cfg["synthetic"]["pool_gpus"], check_every=1)
+    t_s = local_epoch(dt.date(2017, 11, 17), 17) - epoch0
+    event = Event("test", t_s, t_s + 2 * H, 2, 0.0)
+    (_, snap), = list(baseline_snapshots(base_engine, [t_s]))
+    metrics, base, pol = run_pair(snap, event, policy_none, pp, cfg["grid"]["h_after_h"] * H, restore_s=0)
+    assert abs(metrics.shed_mwh) < 1e-12 and metrics.rebound_mwh == 0.0
+    assert base.end_times() == pol.end_times() and all(e is not None for e in pol.end_times().values())
+    # the same snapshot with a real cut and the gate on must change something and still finish every job
+    event20 = Event("test", t_s, t_s + 2 * H, 2, 0.2)
+    m20, _, pol20 = run_pair(snap, event20, policy_none, pp, cfg["grid"]["h_after_h"] * H, restore_s=0)
+    assert m20.shed_mwh > 0 and all(e is not None for e in pol20.end_times().values())
+
+
+def test_events_are_in_window_in_local_evening_and_seeded():
+    cfg = load_config()
+    g = cfg["grid"]
+    epoch0 = epoch_from_iso(cfg["synthetic"]["epoch0_utc"])
+    t_lo, t_hi = 0, 25 * 86400
+
+    def make(seed):
+        return generate_events(random.Random(seed), epoch0, t_lo, t_hi, g)
+
+    events = make(1)
+    assert len(events) == len(g["durations_h"]) * len(g["cuts"]) * g["events_per_cell"]
+    for e in events:
+        assert t_lo + g["skip_first_days"] * 86400 <= e.t_start and e.t_end <= t_hi - g["end_margin_days"] * 86400
+        assert e.t_end - e.t_start == e.duration_h * 3600
+        h = local_hour(epoch0 + e.t_start)
+        assert g["start_hour_min"] <= h < g["start_hour_max"] and h * 2 == int(h * 2)   # a half-hour slot
+    cells = {}
+    for e in events:                                 # at most one event per local day within a cell
+        cells.setdefault((e.duration_h, e.cut), []).append(to_local(epoch0 + e.t_start).date())
+    assert all(len(days) == len(set(days)) == g["events_per_cell"] for days in cells.values())
+    assert make(1) == events and make(2) != events

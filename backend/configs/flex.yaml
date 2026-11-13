@@ -10,6 +10,7 @@ seed: 1                 # ASSUMPTION: default seed for synthetic runs
 check_every: 1000       # ASSUMPTION: full safety check every N events on large runs (tests use 1)
 
 synthetic:              # synthetic test data only, never used for paper numbers
+  epoch0_utc: "2017-11-15T00:00:00+00:00"   # ASSUMPTION: UTC time of simulated t = 0 on synthetic runs (the Philly TEST_START date, so local-time rules behave alike)
   pool_gpus: 64         # ASSUMPTION: GPU pool size for synthetic runs (the Philly G comes from the machines table in S8)
 
 cloud:
@@ -37,3 +38,14 @@ cap_curve:                # speed as a function of r = f * P_max / P_uncapped(u)
     - [0.5, 0.55]
     - [0.7, 0.80]
     - [1.0, 1.0]
+
+grid:                     # curtailment events (D13) and the paired-run horizon (D6)
+  durations_h: [1, 2, 4]  # source: docs/track-2/SIM_PLAN.md D13, accessed 2026-11-13
+  cuts: [0.1, 0.2, 0.3]   # source: docs/track-2/SIM_PLAN.md D13, accessed 2026-11-13
+  events_per_cell: 10     # source: docs/track-2/SIM_PLAN.md D13 (10 events per duration x cut), accessed 2026-11-13
+  slot_minutes: 30        # source: docs/track-2/SIM_PLAN.md D13 (a random half hour), accessed 2026-11-13
+  start_hour_min: 17      # source: docs/track-2/SIM_PLAN.md D13 (17:00 America/Los_Angeles), accessed 2026-11-13
+  start_hour_max: 20      # source: docs/track-2/SIM_PLAN.md D13 (start slots before 20:00), accessed 2026-11-13
+  skip_first_days: 2      # source: docs/track-2/SIM_PLAN.md D13 (only on days >= 2 after the window start), accessed 2026-11-13
+  end_margin_days: 1      # source: docs/track-2/SIM_PLAN.md D13 (end before window end - 1 day), accessed 2026-11-13
+  h_after_h: 24           # source: docs/track-2/SIM_PLAN.md D6 (default H_after), accessed 2026-11-13
