@@ -64,7 +64,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 
 ### Block D: transformer code, then train it unattended (~5-7 h of sessions)
 
-- [ ] **12. [T1] T3a Transformer code + smoke run on the GTX 1650** (4-6 h). Its report says whether full
+- [x] **12. [T1] T3a Transformer code + smoke run on the GTX 1650** (4-6 h). Its report says whether full
       training fits locally (< ~1.5 h) or needs Kaggle.
 - [ ] **13. [T1] T3b Start the full training run** (~1 h of your time: local run, or upload to Kaggle per
       `ml/KAGGLE.md`). **Unattended**: once it is running, go straight to step 14.
@@ -196,3 +196,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 9 (S3) | ce30093 | flex/power.py (D5 power, D9 cap curve, tracker, cloud energy); power/cap params ASSUMPTION in flex.yaml; 10 tests pass; 20k jobs with tracker 1.0 s |
 | 2026-11-13 | 10 (S4) | ca39926 | flex/grid.py (D13 events, LA local time), metrics.py (D6 shed metrics), paired.py (snapshots, run_base/run_event/run_pair, gate D10), engine admit hook + truncate_arrivals; 12 tests pass |
 | 2026-11-13 | 11 (S5) | c7d4142 | flex/predictions.py (contract lookup, oracle fallback, validation); synthetic oracle/last2 writer; real oracle.csv/last2.csv load (25,044 / 24,536 jobs); S4 events now share 10 start times; 14 tests pass |
+| 2026-11-13 | 12 (T3a) | d2e2f38 | 69,702-param transformer; smoke val loss 1.775 -> 1.440; 47 s/epoch on GTX 1650 (30 epochs ~24 min) so T3b runs locally |
