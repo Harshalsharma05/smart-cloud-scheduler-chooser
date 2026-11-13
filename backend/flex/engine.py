@@ -35,6 +35,8 @@ class Engine:
         self.cloud = cloud
         self.cap_f, self.speed_fn = 1.0, None   # cluster-wide power cap level and its speed function
         self.admit = None            # optional gate: admit(job) -> bool, asked before every on-prem start (D10)
+        self.on_hold = None          # optional: on_hold(job) for an arrival that the gate refuses (burst-only uses it)
+        self.info = {}               # free-form notes a policy leaves for the result row (e.g. cap_level)
         for j in sorted(jobs, key=lambda j: (j.submit, j.job_id)):
             self._push(j.submit, SUBMIT, j.job_id, 0)
 
@@ -61,6 +63,8 @@ class Engine:
             self.queue.append(job)
             self._qsizes[job.gpus] += 1
             self._schedule(new=job)
+            if self.on_hold and job.state == QUEUED and self.admit is not None and not self.admit(job):
+                self.on_hold(job)
         self.n_events += 1
         if self.check_every and self.n_events % self.check_every == 0:
             safety.check(self)
@@ -232,10 +236,12 @@ class Engine:
             return False
         if job.state == RUNNING:
             self._account(job, "onprem")
+            job.burst_rem = job.wall_s + job.extra_work - job.work_done
             self.free += job.gpus
             self.running.discard(job.job_id)
             job.extra_work += self.cloud.params.migrate_s
         else:
+            job.burst_rem = job.wall_s + job.extra_work - job.work_done
             idx = next(i for i, q in enumerate(self.queue) if q is job)
             del self.queue[idx]
             self._dequeue_size(job)

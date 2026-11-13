@@ -31,6 +31,7 @@ class FJob:
     n_starts: int = 0           # first starts from QUEUED (must stay <= 1)
     n_suspends: int = 0
     n_resumes: int = 0
+    burst_rem: float | None = None   # remaining work (nominal s) when the job was burst; for cloud-waste metrics
     first_start: int | None = None
     end: int | None = None
     on_cloud: bool = False

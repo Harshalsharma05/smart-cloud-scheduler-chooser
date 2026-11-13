@@ -14,6 +14,11 @@ class CloudParams:
     max_gpus: int           # cap on cloud GPUs in use (booting + running)
 
 
+def params_from_config(cfg) -> CloudParams:
+    c = cfg["cloud"]
+    return CloudParams(c["price_per_gpu_h"], c["boot_delay_s"], c["migrate_s"], c["min_billed_s"], c["max_cloud_gpus"])
+
+
 @dataclass
 class Instance:
     job_id: str

@@ -3,12 +3,14 @@ import datetime as dt
 import random
 
 from flex.cloud import Cloud, CloudParams, total_cost
+from flex.metrics import COLUMNS, CostParams
 from flex.engine import Engine
 from flex.grid import Event, epoch_from_iso, generate_events, local_epoch, local_hour, to_local
 from flex.models import FJob, load_config
 from flex.paired import baseline_snapshots, policy_none, run_pair
 from flex.power import PowerParams, PowerTracker, make_speed_fn, params_from_config, power_kw
-from flex.predictions import load_predictions, oracle_values
+from flex.policies import World, run_policy, world_from_config
+from flex.predictions import Predictions, load_predictions, oracle_values
 from traces.synthetic import generate, write_predictions
 
 H = 3600
@@ -217,3 +219,53 @@ def test_synthetic_prediction_files_follow_the_contract(tmp_path):
         assert grid == [e for e in (0, 60, 600, 3600, 14400, 43200) if e < j.wall_s]   # rows only while running
         assert grid == l2.rows[j.job_id][0]
         assert orc.lookup(j, 0) == oracle_values(j, 0)
+
+
+def test_delay_only_hand_case():
+    # 4 GPUs, no host power and PUE 1, so a busy GPU draws 50 + u (250 - 50) W and an idle one 50 W.
+    pp = PowerParams(p_idle_w=50, p_max_w=250, h_idle_w=0, h_busy_w=0, pue=1.0, cloud_pue=1.0)
+    cp = CloudParams(price_per_gpu_h=3.0, boot_delay_s=300, migrate_s=120, min_billed_s=60, max_gpus=100)
+    world = World(pp, make_speed_fn(pp, [(0.3, 0.5), (1.0, 1.0)]), [1.0, 0.9, 0.8, 0.7, 0.6], cp,
+                  CostParams(c_delay=3.0, m=1, w_fail=0), Predictions("oracle", {}), 24 * H, restore_s=0)
+    # A: Pass, u=1 (250 W, saves 200 W); B: Pass, u=0.5 (150 W, saves 100 W); C: Failed, u=1 (saves 200 W). All 10 h.
+    jobs = [FJob("A", "u", 0, 1, 10 * H, "Pass", util=1.0), FJob("B", "u", 0, 1, 10 * H, "Pass", util=0.5),
+            FJob("C", "u", 0, 1, 10 * H, "Failed", util=1.0)]
+    eng = Engine(jobs, G=4, check_every=1, cloud=Cloud(cp))
+    event = Event("hand", 1 * H, 2 * H, 1, 0.5)                  # 1 h event, 50% cut
+    (_, snap), = list(baseline_snapshots(eng, [event.t_start]))
+    row, base, pol = run_policy(snap, event, "delay", world, "oracle", return_runs=True)
+    # Base power 250 + 150 + 250 + 50 = 700 W, so P* = 350 W. Cost per kW: C 0 (a Failed job loses nothing),
+    # A 3 / 0.2 = 15, B 3 / 0.1 = 30. Suspend C (-200 W -> 500 W), then A (-200 W -> 300 W <= 350 W): B keeps running.
+    assert abs(row["target_kw"] - 0.35) < 1e-12 and row["n_suspended"] == 2
+    assert pol.engine.jobs["C"].n_suspends == 1 and pol.engine.jobs["A"].n_suspends == 1
+    assert pol.engine.jobs["B"].n_suspends == 0
+    assert row["compliance"] == 1.0 and row["shortfall_kw"] == 0.0
+    assert abs(row["shed_mwh"] - 0.0004) < 1e-12                 # (700 - 300) W for 1 h
+    # A is delayed by 1 h (1 GPU-h of Pass work), C by 1 h but Failed jobs have weight 0: cost = 3 USD x 1 GPU-h.
+    assert abs(row["dgpuh_good"] - 1.0) < 1e-9 and abs(row["dgpuh_all"] - 2.0) < 1e-9
+    assert abs(row["cost_usd"] - 3.0) < 1e-9 and row["cloud_usd"] == 0.0 and row["missed_deadlines"] == 0
+    assert abs(row["usd_per_mwh"] - 3.0 / 0.0004) < 1e-6
+    assert pol.engine.jobs["A"].end == base.engine.jobs["A"].end + H
+
+
+def test_three_policies_run_on_the_synthetic_default_event():
+    cfg = load_config()
+    epoch0 = epoch_from_iso(cfg["synthetic"]["epoch0_utc"])
+    jobs = generate(random.Random(cfg["seed"]), days=6)
+    for j in jobs:                                              # deadlines for 30% of jobs (the real rule comes in S8)
+        if j.job_id[-1] in "012":
+            j.deadline = j.submit + 3 * j.wall_s
+    world = world_from_config(cfg, Predictions("oracle", {}))
+    eng = Engine(jobs, cfg["synthetic"]["pool_gpus"], check_every=1000, cloud=Cloud(world.cloud))
+    t_s = local_epoch(dt.date(2017, 11, 18), 17) - epoch0
+    event = Event("default", t_s, t_s + 2 * H, 2, 0.2)          # the default event: 2 h, 20%
+    (_, snap), = list(baseline_snapshots(eng, [t_s]))
+    rows = {name: run_policy(snap, event, name, world, "oracle") for name in ("delay", "cap", "burst")}
+    for name, row in rows.items():
+        assert list(row) == COLUMNS and row["policy"] == name
+        assert row["compliance"] >= 0.95 or row["shortfall_kw"] > 0, (name, row)   # meets P* or reports a shortfall
+        assert row["shed_mwh"] > 0
+    assert rows["cap"]["cap_level"] is not None and rows["cap"]["n_burst"] == 0 and rows["cap"]["n_suspended"] == 0
+    assert rows["burst"]["n_burst"] > 0 and rows["burst"]["cloud_usd"] > 0 and rows["burst"]["n_suspended"] == 0
+    assert rows["delay"]["n_suspended"] > 0 and rows["delay"]["cloud_usd"] == 0
+    print({k: (round(v["compliance"], 3), round(v["shortfall_kw"], 2), v["usd_per_mwh"]) for k, v in rows.items()})

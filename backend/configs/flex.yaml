@@ -16,7 +16,10 @@ synthetic:              # synthetic test data only, never used for paper numbers
 cloud:
   min_billed_s: 60      # source: docs/track-2/SIM_PLAN.md D8 (per-second billing, 60 s minimum), accessed 2026-11-13
   max_cloud_gpus: 1000  # source: docs/track-2/SIM_PLAN.md D8 (default cap; sensitivity later), accessed 2026-11-13
-  # price_per_gpu_h, boot_delay_s, migrate_s, restore_s are added in S11 (no value invented here; tests pass their own)
+  price_per_gpu_h: 3.0  # ASSUMPTION - replace in S11 (USD per GPU-hour)
+  boot_delay_s: 300     # ASSUMPTION - replace in S11 (request -> READY)
+  migrate_s: 120        # ASSUMPTION - replace in S11 (extra work when a running job moves to the cloud)
+  restore_s: 60         # ASSUMPTION - replace in S11 (extra work when a suspended job resumes)
 
 power:                    # one representative GPU type (D5); every value is a placeholder until S11
   p_idle_w: 50            # ASSUMPTION - replace in S11 (one GPU, idle, W)
@@ -49,3 +52,10 @@ grid:                     # curtailment events (D13) and the paired-run horizon 
   skip_first_days: 2      # source: docs/track-2/SIM_PLAN.md D13 (only on days >= 2 after the window start), accessed 2026-11-13
   end_margin_days: 1      # source: docs/track-2/SIM_PLAN.md D13 (end before window end - 1 day), accessed 2026-11-13
   h_after_h: 24           # source: docs/track-2/SIM_PLAN.md D6 (default H_after), accessed 2026-11-13
+
+cap_levels: [1.0, 0.9, 0.8, 0.7, 0.6]   # source: docs/track-2/SIM_PLAN.md D9 (cluster-wide cap levels x P_max), accessed 2026-11-13
+
+cost:                     # cost of an event (D7)
+  c_delay_factor: 1.0     # source: docs/track-2/SIM_PLAN.md D7 (c_delay = the cloud $/GPU-hour; sensitivity 0.5x and 2x), accessed 2026-11-13
+  m: 1                    # source: docs/track-2/SIM_PLAN.md D7 (missed-deadline multiplier; sensitivity 0 and 3), accessed 2026-11-13
+  w_fail: 0               # source: docs/track-2/SIM_PLAN.md D7 (delay weight of Failed/Killed jobs; sensitivity 1), accessed 2026-11-13
