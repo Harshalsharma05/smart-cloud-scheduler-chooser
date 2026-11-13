@@ -4,6 +4,7 @@ import random
 from flex.cloud import Cloud, CloudParams, total_cost
 from flex.engine import Engine
 from flex.models import FJob, load_config
+from flex.power import PowerParams, PowerTracker, make_speed_fn, params_from_config, power_kw
 from traces.synthetic import generate
 
 H = 3600
@@ -70,3 +71,50 @@ def test_burst_running_job_is_billed_from_ready():
     eng.run_to_drain()
     assert eng.jobs["A"].end == 1 * H + 300 + 3600 + 120
     assert abs(total_cost(eng.cloud, eng.now) - 2 * 3.0 * 3720 / 3600) < 1e-9
+
+
+def test_power_model_and_tracker():
+    # Hand calculation. 4 GPUs, one busy job (1 GPU, u = 0.5), 3 idle. P_idle 50, P_max 250, H_idle 100, H_busy 50, PUE 1.3.
+    pp = PowerParams(p_idle_w=50, p_max_w=250, h_idle_w=100, h_busy_w=50, pue=1.3, cloud_pue=1.2)
+    curve = [(0.3, 0.55), (0.5, 0.80), (0.7, 0.93), (1.0, 1.0)]
+    j = FJob(job_id="A", user="u", submit=0, gpus=1, wall_s=10 * H, status="Pass", util=0.5)
+    eng = Engine([j], G=4, check_every=1)
+    tracker = PowerTracker(pp)
+    tracker.attach(eng)
+    eng.run_until(1)
+    # no cap: GPU 50 + 0.5*200 = 150; idle 3*50 = 150; host 4*100 + 1*50 = 450 -> 750 W * 1.3 = 975 W
+    assert abs(power_kw(eng, pp) - 0.975) < 1e-9
+    assert abs(tracker.power_at(1) - 0.975) < 1e-9
+    # cap f = 0.5 binds (125 W < 150 W): (125 + 150 + 450) * 1.3 = 942.5 W; speed from r = 125/150
+    eng.run_until(H)
+    eng.set_cap(0.5, make_speed_fn(pp, curve))
+    assert abs(power_kw(eng, pp) - 0.9425) < 1e-9
+    r = 125 / 150                                      # lies on the 0.7 -> 1.0 segment of the curve
+    assert abs(j.speed - (0.93 + (1.0 - 0.93) * (r - 0.7) / 0.3)) < 1e-12
+    # energy over [0, 2 h]: 1 h at 0.975 kW, then 1 h at 0.9425 kW (cap 0.5 from 1 h to 2 h)
+    eng.run_until(2 * H)
+    eng.set_cap(1.0)
+    assert abs(tracker.energy_kwh(0, 2 * H) - (0.975 + 0.9425)) < 1e-9
+    # cap f = 0.8 does not bind (200 W > 150 W): power as with no cap, speed 1
+    eng.set_cap(0.8)
+    assert abs(power_kw(eng, pp) - 0.975) < 1e-9 and j.speed == 1.0
+
+
+def test_energy_is_sum_of_steps_on_a_synthetic_day():
+    cfg = load_config()
+    pp = params_from_config(cfg)
+    jobs = generate(random.Random(cfg["seed"]), days=1)
+    eng = Engine(jobs, cfg["synthetic"]["pool_gpus"], check_every=1)
+    tracker = PowerTracker(pp)
+    tracker.attach(eng)
+    eng.run_to_drain()
+    eng.run_until(eng.now + 3600)                    # clock moves past the last event: one more step is recorded
+    steps = tracker.steps
+    assert steps[0][0] == 0 and all(a[0] < b[0] for a, b in zip(steps, steps[1:]))
+    by_hand = sum(p * (t1 - t0) for (t0, p), (t1, _) in zip(steps, steps[1:])) / 3600.0
+    assert abs(tracker.energy_kwh(0, steps[-1][0]) - by_hand) < 1e-9
+    # splitting the window at any point gives the same total (no gaps, no double counting)
+    mid = eng.now // 3
+    assert abs(tracker.energy_kwh(0, mid) + tracker.energy_kwh(mid, steps[-1][0]) - by_hand) < 1e-9
+    # final state is an empty cluster: idle floor only
+    assert abs(steps[-1][1] - power_kw(eng, pp)) < 1e-12

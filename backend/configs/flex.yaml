@@ -16,3 +16,24 @@ cloud:
   min_billed_s: 60      # source: docs/track-2/SIM_PLAN.md D8 (per-second billing, 60 s minimum), accessed 2026-11-13
   max_cloud_gpus: 1000  # source: docs/track-2/SIM_PLAN.md D8 (default cap; sensitivity later), accessed 2026-11-13
   # price_per_gpu_h, boot_delay_s, migrate_s, restore_s are added in S11 (no value invented here; tests pass their own)
+
+power:                    # one representative GPU type (D5); every value is a placeholder until S11
+  p_idle_w: 50            # ASSUMPTION - replace in S11 (one GPU, idle, W)
+  p_max_w: 250            # ASSUMPTION - replace in S11 (one GPU at full load, W)
+  h_idle_w: 100           # ASSUMPTION - replace in S11 (host power per installed GPU, always on, W)
+  h_busy_w: 50            # ASSUMPTION - replace in S11 (extra host power per busy GPU, W)
+  pue: 1.3                # ASSUMPTION - replace in S11 (on-prem facility)
+  cloud_pue: 1.2          # ASSUMPTION - replace in S11 (cloud facility, used only for E5 carbon)
+
+cap_curve:                # speed as a function of r = f * P_max / P_uncapped(u), piecewise linear (D9); r >= 1 means speed 1
+  variant: optimistic     # ASSUMPTION - replace in S11 (which curve is the default)
+  optimistic:             # ASSUMPTION - replace in S11 ([r, speed] points; Zeus / Patel et al. to be read in S11)
+    - [0.3, 0.55]
+    - [0.5, 0.80]
+    - [0.7, 0.93]
+    - [1.0, 1.0]
+  pessimistic:            # ASSUMPTION - replace in S11
+    - [0.3, 0.30]
+    - [0.5, 0.55]
+    - [0.7, 0.80]
+    - [1.0, 1.0]

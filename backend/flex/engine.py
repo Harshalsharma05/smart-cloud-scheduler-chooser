@@ -71,6 +71,7 @@ class Engine:
         while self.heap and self.heap[0][0] <= t:
             self._step()
         self.now = max(self.now, t)
+        self._notify()
 
     def run_to_drain(self):
         """Handle all remaining events."""
@@ -84,6 +85,11 @@ class Engine:
             return copy.deepcopy(self)
         finally:
             self.on_event = hook
+
+    def _notify(self):
+        """Tell the on_event hook the state may have changed at `now` (after clock moves and job moves)."""
+        if self.on_event:
+            self.on_event(self, self.now)
 
     # ---- progress and segments ----
     def _account(self, job, where):
@@ -166,6 +172,7 @@ class Engine:
         self.free += job.gpus
         self.running.discard(job.job_id)
         self._schedule()
+        self._notify()
 
     def resume(self, job, restore_s=0):
         """Put a suspended job back in the queue (FCFS position); restore_s is added to its remaining work."""
@@ -178,6 +185,7 @@ class Engine:
         bisect.insort(self.queue, job, key=lambda j: (j.submit, j.job_id))
         self._qsizes[job.gpus] += 1
         self._schedule()
+        self._notify()
 
     def set_cap(self, f, speed_fn=None):
         """Cap every on-prem GPU at level f (1.0 = no cap). speed_fn(job, f) -> speed in (0, 1].
@@ -194,6 +202,7 @@ class Engine:
                 self._account(job, "onprem")
                 job.speed = new_speed
                 self._schedule_finish(job)
+        self._notify()
 
     def burst(self, job):
         """Move a RUNNING or QUEUED job to the cloud; returns False (job untouched) if the cloud GPU cap blocks it.
@@ -218,6 +227,7 @@ class Engine:
         cloudlib.request(self.cloud, job.job_id, job.gpus, self.now)
         self._push(self.now + self.cloud.params.boot_delay_s, READY, job.job_id, job.version)
         self._schedule()
+        self._notify()
         return True
 
     def _cloud_ready(self, job):
