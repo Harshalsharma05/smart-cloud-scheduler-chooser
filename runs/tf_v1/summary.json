@@ -1,0 +1,100 @@
+{
+  "name": "tf_v1",
+  "config": {
+    "name": "tf_v1",
+    "epochs": 30,
+    "batch": 512,
+    "lr": 0.001,
+    "patience": 3,
+    "max_rows": null,
+    "amp": false,
+    "seed": 0,
+    "data": "C:\\AA_STUDY\\College Materials\\Sem-7\\MINOR PROJECT\\smart-scheduler-chooser\\data\\processed",
+    "out": "C:\\AA_STUDY\\College Materials\\Sem-7\\MINOR PROJECT\\smart-scheduler-chooser\\runs",
+    "H": 32,
+    "status_loss_weight": 1.0
+  },
+  "params": 69702,
+  "epochs_run": 9,
+  "best_val_loss": 1.3242954015731812,
+  "seconds_per_epoch": 20.23794248369005,
+  "gpu": "NVIDIA GeForce GTX 1650",
+  "peak_gpu_mem_mb": 247.8,
+  "train_rows": 207717,
+  "val_rows": 52373,
+  "git_commit": "f283962",
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.0613978393679862,
+      "val_loss": 1.4312949180603027,
+      "val_pinball": 0.5116497278213501,
+      "val_ce": 0.9196450710296631,
+      "seconds": 47.09469127655029
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.7697856338190904,
+      "val_loss": 1.4095913171768188,
+      "val_pinball": 0.4776986241340637,
+      "val_ce": 0.9318925738334656,
+      "seconds": 46.44474935531616
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.7104617550561582,
+      "val_loss": 1.3323131799697876,
+      "val_pinball": 0.466063529253006,
+      "val_ce": 0.8662494421005249,
+      "seconds": 18.607406616210938
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.6732799313489026,
+      "val_loss": 1.3520525693893433,
+      "val_pinball": 0.4712229371070862,
+      "val_ce": 0.8808296322822571,
+      "seconds": 11.633115768432617
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.6457948193936943,
+      "val_loss": 1.330764889717102,
+      "val_pinball": 0.466666579246521,
+      "val_ce": 0.8640981912612915,
+      "seconds": 11.627152919769287
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.6254367420577035,
+      "val_loss": 1.3242954015731812,
+      "val_pinball": 0.46629008650779724,
+      "val_ce": 0.8580054044723511,
+      "seconds": 11.63004732131958
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.6098844070297569,
+      "val_loss": 1.3918890953063965,
+      "val_pinball": 0.4558168649673462,
+      "val_ce": 0.9360722303390503,
+      "seconds": 11.700307607650757
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.59725484372969,
+      "val_loss": 1.3561248779296875,
+      "val_pinball": 0.46200501918792725,
+      "val_ce": 0.8941199779510498,
+      "seconds": 11.677225112915039
+    },
+    {
+      "epoch": 9,
+      "train_loss": 0.587060121162447,
+      "val_loss": 1.3996614217758179,
+      "val_pinball": 0.4545827805995941,
+      "val_ce": 0.9450788497924805,
+      "seconds": 11.726786375045776
+    }
+  ]
+}
