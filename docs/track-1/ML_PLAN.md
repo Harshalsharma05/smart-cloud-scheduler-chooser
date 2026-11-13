@@ -246,7 +246,7 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
 - **`oracle`:**
   - `rt_p10 = rt_p50 = rt_p90 = max(60, wall_s − e)`
   - `p_fail = 1` if Failed, `p_cancel = 1` if Killed, else 0
-  - It covers the test jobs **plus the train/val jobs still running at `TEST_START`**. The contract says the simulator uses oracle values for those.
+  - *(Superseded by T2c: the export key set is now all valid jobs overlapping `[SIM_START, TEST_END)`.)* It covers the test jobs **plus the train/val jobs still running at `TEST_START`**.
   - The checker accepts these extra keys for `oracle` only.
 - **`last2` (Tsafrir et al., TPDS 2007):**
   - The estimate is the mean `wall_s` of the user's last two finished jobs.
@@ -264,6 +264,33 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
 **Done-check:** `check_predictions.py` prints OK for both files.
 
 **Pause point:** after the commit. **→ Tell the Track 2 chat that `oracle` and `last2` are ready.**
+
+---
+
+## T2c. Re-export `oracle` and `last2` for all jobs overlapping the simulation window (≈1.5–2 h)
+
+**Why (Track 2 request, 13 Nov):** Track 2 starts its simulation on `SIM_START` = 2017-11-08, seven days before `TEST_START`, so jobs already running or waiting then need prediction rows too (carry-over jobs, val-period jobs). With test-only keys, `last2` was half oracle at early events. This replaces the T2b key rule ("test keys, plus oracle warm-up extras") for all five files.
+
+**New export key set (one rule for every prediction file):**
+- *Export jobs* = **valid jobs** (T2 filter: started, not censored, `wall_s > 0`, `num_gpus > 0`) with `end_time > SIM_START` and `submit_time < TEST_END`. Never-started jobs are excluded.
+- *Export keys* = every `ml_examples` row (all grid points with `e < wall_s`, any split) of those jobs.
+- The causal rule is unchanged: history = the same user's jobs with `end_time ≤ t_obs`.
+- Add `SIM_START = "2017-11-08"` to `ml/config.py`. Track 2 reads it and never copies it.
+
+**Tasks:**
+- Add one shared function (e.g. `export_keys(jobs, ex)`) used by the checker and by every exporter.
+- `check_predictions.py`: the expected key set is now the export keys for **all five files**. Remove the `--allow-extra-keys` special case (no extras exist any more).
+- `export_simple.py`: write `oracle.csv` and `last2.csv` over the export keys. The values are defined exactly as in T2b.
+- Update the T2b test if it relied on the old key rule.
+
+**Report must contain:**
+- Export jobs and rows per split (train, val, test). For `gbdt`, `lightgbm` and `transformer`, **train rows are in-sample**, and val rows were used for early stopping. Only test rows are clean.
+- For jobs overlapping `[SIM_START, TEST_END)` that are **not** in the export set, the count by reason: never started, censored, `wall_s ≤ 0`, `num_gpus = 0`. (Censored jobs hold GPUs but have no runtime; Track 2 handles them.)
+- `oracle` and `last2` row counts, with the checker output.
+
+**Done-check:** `check_predictions.py` prints OK for `oracle.csv` and `last2.csv` with the new key set. `pytest ml/tests -q` passes.
+
+**Pause point:** after the commit. **→ Tell the Track 2 chat the new row counts and the by-reason counts.**
 
 ---
 
@@ -354,6 +381,7 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
   - log-loss (3 classes)
   - AUROC for "Failed vs not"
   - Brier score for `p_fail`
+- **Per-split table (new, T2c):** the same metrics over the export rows split by train (in-sample), val (early stopping) and test (clean), for the learned models. The headline table stays test-only.
 - **Outputs:**
   - `ml/results/predictor_metrics.csv`, which the Track 2 paper figures can read
   - `ml/results/predictor_metrics.md`, a table ready to paste into the paper draft
@@ -373,7 +401,7 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
 
 **Goal:** finish the contract.
 
-- Write `predictions/gbdt.csv`, `predictions/lightgbm.csv` and `predictions/transformer.csv` for the test keys.
+- Write `predictions/gbdt.csv`, `predictions/lightgbm.csv` and `predictions/transformer.csv` for the **export keys** (T2c). Train-period rows are **in-sample** for all three models and val rows were used for early stopping; the report says so and gives the row counts per split.
 - Run `check_predictions.py` on **all five files**.
 - Write `predictions/README.md` (git-ignored with the folder, so also copy it to `ml/reports/T5_exports.md`). Per file, it lists:
   - the source checkpoint or model
@@ -430,6 +458,8 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
 
 ## 10. Contract clarifications to confirm with Track 2 (before T2)
 
+*(Item 9 was added on 13 Nov: the export key set changed in T2c.)*
+
 1. **Observation time:** `t_obs = submit_time` at *e* = 0, and `first_start_time + e` otherwise. The contract text says "submit time + elapsed", which is too early for jobs that waited in the queue. It is still leak-free, but it wastes information.
 2. **Test window:** `TEST_START` = 2017-11-15 and `TEST_END` = 2017-12-15 (submission dates, confirmed by the T1 report). The simulator uses the same window.
 3. **`oracle.csv` also covers train and val jobs still running at `TEST_START`.** The other files cover test jobs only.
@@ -438,3 +468,4 @@ Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan 
 6. **Additive columns** in `philly_jobs.parquet`: `censored` and `never_started`. `philly_machines.parquet` is **required** (contract v3), with columns `machine_id, num_gpus, gpu_mem_gb`. *(Merged into contract v3.)*
 7. **GPU model is not confirmed** by the trace or the paper. The machine list has 12 GB and 24 GB GPUs, so keep the ± 20% power sensitivity.
 8. **New, non-contract output** for the paper: `ml/results/predictor_metrics.csv`.
+9. **Export key set (T2c, requested by Track 2):** every prediction file covers all valid jobs with `end_time > SIM_START` (2017-11-08) and `submit_time < TEST_END`, at all grid points `e < wall_s`, whatever their split. Predictions for train-period jobs are in-sample for the learned models; E3 results should be checked on clean jobs (submitted on or after `TEST_START`) as a robustness check. `PROJECT_CONTEXT.md` section 7 must be updated: the line "Predictions exist only for test-period jobs" and the oracle warm-up rule are replaced by this rule.

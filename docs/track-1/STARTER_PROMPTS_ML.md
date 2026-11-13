@@ -118,6 +118,26 @@ Read CLAUDE.md and docs/track-1/ML_PLAN.md (T2b and section 10). Do only phase T
 
 Done-check: python ml/check_predictions.py predictions/oracle.csv --allow-extra-keys and python ml/check_predictions.py predictions/last2.csv both print OK. Report the row counts and the number of distinct test jobs.
 Commit as "T2b: oracle and last2 predictions + checker". Stop and print the report.
+
+Clarification for oracle warm-up jobs: "warm-up" = valid jobs (same filter as T2) with submit_time < TEST_START and end_time > TEST_START. That covers jobs running at TEST_START and jobs queued at TEST_START that start later. Include all their grid rows (e < wall_s) in oracle.csv, in addition to the test keys. In the T2b report, print the warm-up counts: running at TEST_START (first_start_time <= TEST_START) vs queued at TEST_START (first_start_time > TEST_START), and the number of oracle rows added. check_predictions.py --allow-extra-keys must accept exactly those extra keys for oracle only, and for no other file.
+```
+
+---
+
+## T2c: Re-export oracle and last2 for all jobs overlapping the simulation window
+
+```
+Read CLAUDE.md and docs/track-1/ML_PLAN.md (section 2 and T2c, T2b). Do only phase T2c. First commit the updated docs/track-1 files as "docs: T2c export key set".
+
+Track 2 starts its simulation on 2017-11-08, so it needs prediction rows for every valid job overlapping [2017-11-08, 2017-12-16), not only test jobs. Implement the rule in ML_PLAN T2c exactly:
+1. ml/config.py: add SIM_START = "2017-11-08" (half-open window [SIM_START, TEST_END)).
+2. One shared function export_keys(jobs, ex): valid jobs (T2 filter) with end_time > SIM_START and submit_time < TEST_END; all their ml_examples rows (all splits, all grid points e < wall_s). Never-started jobs are excluded. The causal rule is unchanged.
+3. ml/check_predictions.py: the expected key set is the export keys for ALL files; remove the --allow-extra-keys special case.
+4. ml/export_simple.py: write predictions/oracle.csv and predictions/last2.csv over the export keys (values exactly as in T2b). Update the T2b test if needed.
+5. Report: export jobs and rows per split (train/val/test); for jobs overlapping the window that are NOT in the export set, the count by reason (never started, censored, wall_s <= 0, num_gpus = 0); oracle and last2 row counts; the checker output. Say clearly that the train and val rows will be in-sample / early-stopping rows for the learned models.
+
+Done-check: python ml/check_predictions.py predictions/oracle.csv and predictions/last2.csv both print OK; pytest ml/tests -q passes.
+Commit as "T2c: oracle and last2 over all jobs overlapping the simulation window". Add a line "7b. [T1] T2c" to docs/WORK_ORDER.md (ticked, with a progress-log line) and commit "work order: step 7b done". Stop and print the report.
 ```
 
 ---
@@ -170,7 +190,7 @@ runs/tf_v1/ is back from Kaggle. Run predict.py on val and print val pinball los
 Read CLAUDE.md and docs/track-1/ML_PLAN.md (T4). Do only phase T4.
 
 1. ml/baselines.py: gbdt (sklearn HistGradientBoosting, quantile 0.1/0.5/0.9 + classifier) and lightgbm (quantile + multiclass), both on the same flat feature table (current-job + aggregated history features from ml_examples), early stopping on val, quantiles sorted per row, probabilities clipped so p_fail + p_cancel <= 1. Save the models under runs/gbdt/ and runs/lightgbm/.
-2. ml/evaluate.py: on the TEST split, for last2, gbdt, lightgbm, transformer (tf_v1) and oracle: mean pinball (log space), median abs error of p50 in minutes, [p10,p90] coverage, 3-class log-loss, AUROC Failed-vs-not, Brier for p_fail; overall and per grid point. Write ml/results/predictor_metrics.csv and predictor_metrics.md.
+2. ml/evaluate.py: on the TEST split, for last2, gbdt, lightgbm, transformer (tf_v1) and oracle, plus a 'prior' reference row for the STATUS metrics only (class frequencies of the train rows per grid point; val check showed it scores 1.04 log-loss vs tf_v1 0.858, so it is the honest floor for a failure predictor): mean pinball (log space), median abs error of p50 in minutes, [p10,p90] coverage, 3-class log-loss, AUROC Failed-vs-not, Brier for p_fail; overall and per grid point. Write ml/results/predictor_metrics.csv and predictor_metrics.md. Also write a second table over the EXPORT rows split by train (in-sample) / val (used for early stopping) / test (clean) for the learned models, so the paper can show how much in-sample predictions flatter them; the headline table stays test-only.
 3. One test, ml/tests/test_t4_metrics.py (metric functions on a 5-row toy example).
 
 Report the numbers exactly as they come out. Do not tune on test.
@@ -185,7 +205,7 @@ Commit as "T4: GBDT/LightGBM baselines + test evaluation". Stop and print the re
 ```
 Read docs/track-1/ML_PLAN.md (T5). Do only phase T5.
 
-Write predictions/gbdt.csv, predictions/lightgbm.csv and predictions/transformer.csv for the test keys (reuse predict.py / baselines.py; floor at 60 s). Run ml/check_predictions.py on all five files (oracle with --allow-extra-keys). Write ml/reports/T5_exports.md (and a copy at predictions/README.md): per file, its source model/checkpoint, date, row count and git commit.
+Write predictions/gbdt.csv, predictions/lightgbm.csv and predictions/transformer.csv for the EXPORT keys from ML_PLAN T2c (export_keys(); train-period rows are in-sample, val rows were used for early stopping; give row counts per split in the report) (reuse predict.py / baselines.py; floor at 60 s). Run ml/check_predictions.py on all five files (all use the same export key set). Write ml/reports/T5_exports.md (and a copy at predictions/README.md): per file, its source model/checkpoint, date, row count and git commit.
 
 Done-check: five OK lines.
 Commit as "T5: all prediction files exported". Stop and print the report.
