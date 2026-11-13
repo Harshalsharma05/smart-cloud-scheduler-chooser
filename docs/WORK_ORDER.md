@@ -80,7 +80,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 
 ### Block F: real results for the abstract (~6-8 h)
 
-- [ ] **17. [T2] S8 Philly loader** (3 h).
+- [x] **17. [T2] S8 Philly loader** (3 h).
 - [ ] **18. [You + Track 2 chat] S11 Parameter sourcing** (1-2 h): the review chat finds and verifies sources; a short
       Claude Code session only edits `configs/flex.yaml` and the parameter table script.
 - [ ] **19. [T2] S12 E1 + E4 on Philly with oracle and last2** (3 h). These are the numbers the abstract may use.
@@ -201,3 +201,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 14 (S6) | 366607c | flex/policies.py (delay/cap/burst-only, gating hook on_hold) + D7 cost, waste and user-impact metrics + result row; cloud/cost params in flex.yaml (cloud values ASSUMPTION); 16 tests pass |
 | 2026-11-13 | 15 (S7) | 6e25d7e | mix controller + selectors (flex/policies.py), flex/experiments.py (e1-e4 synthetic quick runs: e1 19 s), 4 figure scripts, gate power cache (800-GPU stress 4.7 s -> 2.3 s), on_hold rule; P1 reached; 20 tests pass |
 | 2026-11-13 | 16 (W0) | d5d8c21 | paper/main.tex (IEEEtran, anonymous), 9 section files with page budgets, refs.bib empty, numbers.tex stub, README; PDF build NOT verified (no LaTeX installed) |
+| 2026-11-13 | 17 (S8) | 946ca92 | traces/philly.py: 36,751 jobs (12,209 warm-up), G 2,490; baseline run 12 s; mean util 0.41 (util_default 0.5 ASSUMPTION); sim wait 0 vs real 175 min (pool has no VC limits); one paired run 1.2-1.8 s |
