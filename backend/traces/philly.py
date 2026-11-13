@@ -1,5 +1,5 @@
 """Philly jobs for the engine (SIM_PLAN S8). Reads data/processed/philly_jobs.parquet, philly_machines.parquet and
-(optional) philly_job_util.parquet; TEST_START / TEST_END come from ml/config.py (TEST_END is exclusive).
+(optional) philly_job_util.parquet (S9); TEST_START / TEST_END come from ml/config.py (TEST_END is exclusive).
 
 Decisions (S8):
 - Time: job-log times are UTC epoch seconds. Simulated t = epoch - epoch0, epoch0 = TEST_START - warmup_days (flex.yaml).
@@ -17,7 +17,8 @@ Decisions (S8):
 - Dropped: never_started jobs, jobs with 0 GPUs, jobs with wall_s <= 0 (all counted in the report).
   Censored jobs (no end) are kept with wall_s = (last end_time in the log) - first_start_time.
 - Deadlines: D12, only for test-window jobs, drawn in (submit, job_id) order from Random(seed + 1).
-- util: philly_job_util.parquet (S9) if it exists, else util_default from flex.yaml (an ASSUMPTION, logged).
+- util: philly_job_util.parquet (S9) if it exists (unmeasured jobs: the n_minutes-weighted cluster average), else util_default
+  from flex.yaml (an ASSUMPTION, logged).
 """
 import copy
 import importlib.util
@@ -68,7 +69,15 @@ def load_philly(cfg=None):
 
     test_start_utc, test_end_utc = utc_epoch(mc.TEST_START), utc_epoch(mc.TEST_END)
     epoch0 = test_start_utc - int(cfg["philly"]["warmup_days"]) * 86400
+    assert epoch0 == utc_epoch(mc.SIM_START), "ml/config.py SIM_START must equal TEST_START - philly.warmup_days"
     rep = {"rows_in_file": len(raw)}
+    umap, fallback, util_src = {}, float(cfg["philly"]["util_default"]), None
+    util_path = data / "philly_job_util.parquet"
+    if util_path.exists():                                   # S9: measured; unmeasured jobs get the cluster average
+        ut = pd.read_parquet(util_path)
+        umap = ut.set_index("job_id")["gpu_util_mean"].to_dict()
+        fallback = float(np.average(ut["gpu_util_mean"], weights=ut["n_minutes"]))
+        util_src = f"philly_job_util.parquet; unmeasured jobs use the cluster average {fallback:.3f}"
 
     last_end = int(raw["end_time"].max())                  # for censored jobs
     d = raw[~raw["never_started"]]
@@ -99,30 +108,22 @@ def load_philly(cfg=None):
             continue
         used += int(r.num_gpus)
         carry.append(FJob(job_id=r.job_id, user=r.user, submit=0, gpus=int(r.num_gpus), wall_s=int(r.remaining),
-                          status=r.status, util=float(cfg["philly"]["util_default"]), warmup=True, carry=True,
+                          status=r.status, util=float(umap.get(r.job_id, fallback)), warmup=True, carry=True,
                           elapsed0=int(epoch0 - r.first_start_time), submit_real=int(r.submit_time - epoch0)))
     rep["carry_jobs"] = len(carry)
     rep["carry_gpus"] = used
     rep["carry_truncated"] = len(running) - len(carry)
 
     d = d[(d["submit_time"] >= epoch0) & (d["submit_time"] < test_end_utc)].sort_values(["submit_time", "job_id"])
-    util_path = data / "philly_job_util.parquet"
-    umap = {}
-    if util_path.exists():
-        u = pd.read_parquet(util_path).set_index("job_id")["gpu_util_mean"]
-        umap = u.to_dict()
-        util = d["job_id"].map(u).fillna(cfg["philly"]["util_default"]).astype(float).tolist()
-        util_source = (f"philly_job_util.parquet ({int(d['job_id'].isin(u.index).sum())} of {len(d)} jobs measured, "
-                       f"rest util_default)")
+    util = [float(umap.get(j, fallback)) for j in d["job_id"]]
+    if util_src:
+        util_source = f"{util_src} ({int(d['job_id'].isin(umap).sum())} of {len(d)} jobs measured)"
     else:
-        util = [float(cfg["philly"]["util_default"])] * len(d)
-        util_source = f"util_default = {cfg['philly']['util_default']} (ASSUMPTION; philly_job_util.parquet not found)"
+        util_source = f"util_default = {fallback} (ASSUMPTION; philly_job_util.parquet not found)"
 
     jobs = [FJob(job_id=r.job_id, user=r.user, submit=int(r.submit_time - epoch0), gpus=int(r.num_gpus),
                  wall_s=int(r.wall_s), status=r.status, util=float(u_), warmup=bool(r.submit_time < test_start_utc))
             for r, u_ in zip(d.itertuples(index=False), util)]
-    for c in carry:                                         # carry-overs use the measured util too (when it exists)
-        c.util = float(umap.get(c.job_id, c.util))
     jobs = carry + jobs
     test_jobs = [j for j in jobs if not j.warmup]
     assign_deadlines(test_jobs, random.Random(cfg["seed"] + 1), cfg["deadlines"])    # already in (submit, job_id) order

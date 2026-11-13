@@ -104,7 +104,7 @@ does not depend on them.
 - [ ] **24. [T2] S14 E3 predictor comparison** (2 h).
 - [ ] **25. [T2] S13 E2 sweeps + sensitivity** (2 h; reduced grid is fine).
 - [ ] **26. [T2] S15 E5 carbon** (1.5 h; **trim**: one paragraph if short of time).
-- [ ] **27. [T2] S9 Utilisation join** (3-5 h; **trim**: skip and keep the cluster-average fallback if short of time).
+- [x] **27. [T2] S9 Utilisation join** (3-5 h; **trim**: skip and keep the cluster-average fallback if short of time).
       If done, re-run step 19 quickly so E1 uses real utilisation.
 
 ### Block H: finish the paper (~8-10 h)
@@ -212,3 +212,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 17d (S8d) | 50cd35c | carry-over keeps real ids + elapsed0; deltas include warm-up/carry; censored -> Pass; pred_coverage column; (submit, job_id) tie-breaks; 20 tests pass |
 | 2026-11-13 | 18 (S11) | bae65cc | flex.yaml: p_idle 70, PUE 1.58, cloud PUE 1.09, price 3.06, boot 300 sourced; host power, migrate/restore, cap-curve points still ASSUMPTION; paper/tables/params.tex generated |
 | 2026-11-13 | 7b (T2c) | ad2c5f1 | export keys = valid jobs overlapping [2017-11-08, 2017-12-16): 37,262 jobs, 111,451 rows; oracle + last2 pass checker; 4 tests pass |
+| 2026-11-13 | 27 (S9) | pending | philly_job_util.parquet: 37,264 of 37,296 jobs measured (99.9%), 119 s full run; job util mean 0.287 / p50 0.195, minute-weighted 0.558 (now the fallback); cap shed 0.067 -> 0.196 MWh, still compliance 0; FOUND: philly_machines.parquet GPU counts swapped vs util file (G 2490 vs 3030?) |
