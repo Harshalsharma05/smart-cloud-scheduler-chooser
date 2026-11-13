@@ -41,8 +41,8 @@ class Event:
 
 
 def generate_events(rng, epoch0, t_lo, t_hi, cfg):
-    """Events for every (duration, cut) cell, `events_per_cell` each, on distinct local days (at most one
-    event per day within a cell). The window is [t_lo, t_hi) in simulated seconds. cfg = flex.yaml `grid:`.
+    """`events_per_cell` start times (distinct local days, one per day), crossed with every (duration, cut):
+    all cells share the same start times. The window is [t_lo, t_hi) in simulated seconds. cfg = flex.yaml `grid:`.
 
     Rules (D13): start = a half-hour slot between 17:00 and 20:00 local; only on local days at least
     `skip_first_days` after the day of t_lo; the event must end before t_hi - end_margin_days."""
@@ -62,12 +62,9 @@ def generate_events(rng, epoch0, t_lo, t_hi, cfg):
     while m < cfg["start_hour_max"] * 60:
         slots.append((m // 60, m % 60))
         m += step
-    events = []
-    for dur in cfg["durations_h"]:
-        for cut in cfg["cuts"]:
-            chosen = sorted(rng.sample(days, n))
-            for k, day in enumerate(chosen):
-                hh, mm = rng.choice(slots)
-                t_s = local_epoch(day, hh, mm) - epoch0
-                events.append(Event(f"d{dur}h_c{round(cut * 100)}_{k}", t_s, t_s + dur * 3600, dur, cut))
-    return events
+    starts = []
+    for day in sorted(rng.sample(days, n)):
+        hh, mm = rng.choice(slots)
+        starts.append(local_epoch(day, hh, mm) - epoch0)
+    return [Event(f"d{dur}h_c{round(cut * 100)}_{k}", t_s, t_s + dur * 3600, dur, cut)
+            for dur in cfg["durations_h"] for cut in cfg["cuts"] for k, t_s in enumerate(starts)]

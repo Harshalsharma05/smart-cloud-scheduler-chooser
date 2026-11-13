@@ -8,7 +8,8 @@ from flex.grid import Event, epoch_from_iso, generate_events, local_epoch, local
 from flex.models import FJob, load_config
 from flex.paired import baseline_snapshots, policy_none, run_pair
 from flex.power import PowerParams, PowerTracker, make_speed_fn, params_from_config, power_kw
-from traces.synthetic import generate
+from flex.predictions import load_predictions, oracle_values
+from traces.synthetic import generate, write_predictions
 
 H = 3600
 
@@ -157,8 +158,62 @@ def test_events_are_in_window_in_local_evening_and_seeded():
         assert e.t_end - e.t_start == e.duration_h * 3600
         h = local_hour(epoch0 + e.t_start)
         assert g["start_hour_min"] <= h < g["start_hour_max"] and h * 2 == int(h * 2)   # a half-hour slot
-    cells = {}
-    for e in events:                                 # at most one event per local day within a cell
-        cells.setdefault((e.duration_h, e.cut), []).append(to_local(epoch0 + e.t_start).date())
-    assert all(len(days) == len(set(days)) == g["events_per_cell"] for days in cells.values())
+    days = {}                                        # one start per local day; every cell has the same 10 starts
+    for e in events:
+        days.setdefault((e.duration_h, e.cut), []).append((to_local(epoch0 + e.t_start).date(), e.t_start))
+    assert len(days) == 9 and all(len(v) == g["events_per_cell"] for v in days.values())
+    assert all(len({d for d, _ in v}) == g["events_per_cell"] for v in days.values())
+    assert len({tuple(v) for v in days.values()}) == 1
     assert make(1) == events and make(2) != events
+
+
+def test_prediction_lookup_rule_and_floor(tmp_path):
+    # Hand-made file: 001 runs long (wall 20000 s), 002 is short (wall 700 s). Rows exist only while running.
+    csv = tmp_path / "toy.csv"
+    csv.write_text(
+        "job_id,elapsed_s,rt_p10_s,rt_p50_s,rt_p90_s,p_fail,p_cancel\n"
+        "001,0,9000,10000,11000,0.1,0.2\n"
+        "001,60,8940,9940,10940,0.1,0.2\n"
+        "001,600,8400,9400,10400,0.1,0.2\n"
+        "001,3600,5400,6400,7400,0.3,0.1\n"
+        "002,0,600,700,800,0.0,0.0\n"
+        "002,60,540,640,740,0.0,0.0\n"
+        "002,600,60,100,200,0.0,0.0\n")
+    p = load_predictions(csv)
+    assert set(p.rows) == {"001", "002"}                       # ids stay strings ("001" is not 1)
+    a = FJob("001", "u", 0, 1, 20000, "Pass")
+    b = FJob("002", "u", 0, 1, 700, "Pass")
+    assert p.lookup(a, 0) == (9000, 10000, 11000, 0.1, 0.2)
+    assert p.lookup(a, 59) == (8941, 9941, 10941, 0.1, 0.2)    # row 0, gap 59
+    assert p.lookup(a, 600) == (8400, 9400, 10400, 0.1, 0.2)   # exact grid point
+    assert p.lookup(a, 5000) == (4000, 5000, 6000, 0.3, 0.1)   # row 3600, gap 1400
+    assert p.lookup(b, 5000) == (60, 60, 60, 0.0, 0.0)         # row 600, gap 4400: all three floored at 60
+    assert p.lookup(b, 659) == (60, 60, 141, 0.0, 0.0)         # p10 1 and p50 41 are floored to 60; p90 200 - 59 = 141
+    # a job without rows falls back to oracle values from the job itself, and is counted
+    c = FJob("003", "u", 0, 1, 5000, "Failed")
+    assert p.lookup(c, 1000) == (4000, 4000, 4000, 1.0, 0.0)
+    assert p.lookup(c, 4990) == (60, 60, 60, 1.0, 0.0)
+    assert p.fallback_jobs == {"003"} and p.log_fallback_count() == 1
+    # wrong columns are rejected
+    bad = tmp_path / "bad.csv"
+    bad.write_text("job_id,elapsed_s,rt_p50_s\n001,0,5\n")
+    try:
+        load_predictions(bad)
+        assert False, "should reject wrong columns"
+    except ValueError:
+        pass
+
+
+def test_synthetic_prediction_files_follow_the_contract(tmp_path):
+    cfg = load_config()
+    jobs = generate(random.Random(cfg["seed"]), days=3)
+    eng = Engine(jobs, cfg["synthetic"]["pool_gpus"], check_every=0)
+    eng.run_to_drain()
+    write_predictions(list(eng.jobs.values()), tmp_path)
+    orc, l2 = load_predictions(tmp_path / "oracle.csv"), load_predictions(tmp_path / "last2.csv")
+    assert set(orc.rows) == set(l2.rows) == {j.job_id for j in jobs}
+    for j in list(eng.jobs.values())[:50]:
+        grid, vals = orc.rows[j.job_id]
+        assert grid == [e for e in (0, 60, 600, 3600, 14400, 43200) if e < j.wall_s]   # rows only while running
+        assert grid == l2.rows[j.job_id][0]
+        assert orc.lookup(j, 0) == oracle_values(j, 0)
