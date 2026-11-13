@@ -59,7 +59,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 
 - [x] **8. [T2] S2 Running-job moves** (4 h).
 - [x] **9. [T2] S3 Power model** (1.5 h).
-- [ ] **10. [T2] S4 Grid events and paired runs** (2.5 h).
+- [x] **10. [T2] S4 Grid events and paired runs** (2.5 h).
 - [ ] **11. [T2] S5 Predictions reader** (1.5 h).
 
 ### Block D: transformer code, then train it unattended (~5-7 h of sessions)
@@ -194,3 +194,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 7 (T2b) | 23a90dc | oracle.csv 74,728 rows (test 71,806 + 2,922 warm-up), last2.csv 71,806 rows; both pass check_predictions.py |
 | 2026-11-13 | 8 (S2) | 0a5c96c | suspend/resume/set_cap/burst + flex/cloud.py + cloud safety rules; 8 tests pass (4 old + 4 flex); 20k jobs drain in 0.6 s |
 | 2026-11-13 | 9 (S3) | ce30093 | flex/power.py (D5 power, D9 cap curve, tracker, cloud energy); power/cap params ASSUMPTION in flex.yaml; 10 tests pass; 20k jobs with tracker 1.0 s |
+| 2026-11-13 | 10 (S4) | ca39926 | flex/grid.py (D13 events, LA local time), metrics.py (D6 shed metrics), paired.py (snapshots, run_base/run_event/run_pair, gate D10), engine admit hook + truncate_arrivals; 12 tests pass |
