@@ -65,3 +65,7 @@ deadlines:               # D12: a seeded random share of jobs gets deadline = su
   fraction: 0.3          # source: docs/track-2/SIM_PLAN.md D12, accessed 2026-11-13
   slack_min: 2           # source: docs/track-2/SIM_PLAN.md D12 (slack ~ U(2, 4)), accessed 2026-11-13
   slack_max: 4           # source: docs/track-2/SIM_PLAN.md D12, accessed 2026-11-13
+
+philly:                  # real-trace loader (S8)
+  warmup_days: 7         # ASSUMPTION: the simulation starts this many days before TEST_START so the queue and pool are filled by the window start
+  util_default: 0.5      # ASSUMPTION - replace with the measured busy-GPU utilisation (S9); used for every job when philly_job_util.parquet is absent
