@@ -31,11 +31,13 @@ class Engine:
         self._qsizes = Counter()     # gpus -> number of queued jobs, to skip useless scans
         self.heap, self._seq = [], 0
         self.n_events = 0
+        self.mut = 0                 # counts changes of the on-prem power state (start, finish, suspend, burst, cap)
         self.check_every, self.on_event = check_every, on_event
         self.cloud = cloud
         self.cap_f, self.speed_fn = 1.0, None   # cluster-wide power cap level and its speed function
         self.admit = None            # optional gate: admit(job) -> bool, asked before every on-prem start (D10)
-        self.on_hold = None          # optional: on_hold(job) for an arrival that the gate refuses (burst-only uses it)
+        self.on_hold = None          # optional: on_hold(job), once per job the gate refuses although it fits the free GPUs
+        self._held, self._reported = [], set()   # jobs collected during a scheduling pass; job_ids already reported
         self.info = {}               # free-form notes a policy leaves for the result row (e.g. cap_level)
         for j in sorted(jobs, key=lambda j: (j.submit, j.job_id)):
             self._push(j.submit, SUBMIT, j.job_id, 0)
@@ -63,8 +65,6 @@ class Engine:
             self.queue.append(job)
             self._qsizes[job.gpus] += 1
             self._schedule(new=job)
-            if self.on_hold and job.state == QUEUED and self.admit is not None and not self.admit(job):
-                self.on_hold(job)
         self.n_events += 1
         if self.check_every and self.n_events % self.check_every == 0:
             safety.check(self)
@@ -122,20 +122,41 @@ class Engine:
         if not self.queue or self.free < min(self._qsizes):
             return
         if new is not None:          # the queue was stable before `new`, so only `new` can start
-            if new.gpus <= self.free and (self.admit is None or self.admit(new)):
-                self.queue.pop()
-                self._start(new)
+            if new.gpus <= self.free:
+                if self.admit is None or self.admit(new):
+                    self.queue.pop()
+                    self._start(new)
+                else:
+                    self._note_held(new)
+            self._flush_held()
             return
         rest = []
         for i, j in enumerate(self.queue):
             if self.free == 0:
                 rest.extend(self.queue[i:])
                 break
-            if j.gpus <= self.free and (self.admit is None or self.admit(j)):
+            if j.gpus > self.free:
+                rest.append(j)
+            elif self.admit is None or self.admit(j):
                 self._start(j)
             else:
                 rest.append(j)
+                self._note_held(j)
         self.queue = rest
+        self._flush_held()
+
+    def _note_held(self, job):
+        """The gate refused a job that fits the free GPUs: remember it (once) for on_hold."""
+        if self.on_hold is not None and job.job_id not in self._reported:
+            self._reported.add(job.job_id)
+            self._held.append(job)
+
+    def _flush_held(self):
+        """Call on_hold for the jobs collected during the pass, after the pass (the handler may burst, which schedules)."""
+        while self._held:
+            job = self._held.pop(0)
+            if job.state == QUEUED and self.on_hold is not None:
+                self.on_hold(job)
 
     def schedule(self):
         """Full scheduling pass, e.g. when the gate turns off."""
@@ -163,6 +184,7 @@ class Engine:
         assert job.state == QUEUED, f"{job.job_id} started from {job.state}"
         self._dequeue_size(job)
         self.free -= job.gpus
+        self.mut += 1
         job.state, job.mark, job.speed = RUNNING, self.now, self._speed(job)
         if job.first_start is None:
             job.first_start = self.now
@@ -172,6 +194,7 @@ class Engine:
 
     def _finish(self, job):
         on_cloud = job.state == CLOUD_RUNNING
+        self.mut += 1
         self._account(job, "cloud" if on_cloud else "onprem")
         job.work_done = job.wall_s + job.extra_work
         job.state, job.end = DONE, self.now
@@ -187,6 +210,7 @@ class Engine:
         if job.state != RUNNING:
             raise ValueError(f"cannot suspend {job.job_id} in state {job.state}")
         self._account(job, "onprem")
+        self.mut += 1
         job.version += 1                      # drops the pending finish
         job.state, job.speed = SUSPENDED, 0.0
         job.n_suspends += 1
@@ -216,6 +240,7 @@ class Engine:
         if f < 1.0 and self.speed_fn is None:
             raise ValueError("set_cap needs a speed_fn")
         self.cap_f = f
+        self.mut += 1
         for jid in sorted(self.running):
             job = self.jobs[jid]
             new_speed = self._speed(job)
@@ -234,6 +259,7 @@ class Engine:
             raise ValueError(f"cannot burst {job.job_id} in state {job.state}")
         if not cloudlib.can_request(self.cloud, job.gpus):
             return False
+        self.mut += 1
         if job.state == RUNNING:
             self._account(job, "onprem")
             job.burst_rem = job.wall_s + job.extra_work - job.work_done

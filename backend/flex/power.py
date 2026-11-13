@@ -38,9 +38,11 @@ def gpu_power_w(params, util, f=1.0):
 def power_kw(engine, params):
     """Facility power now, from the on-prem state of the engine (cloud jobs are not counted)."""
     busy_w, busy_gpus = 0.0, 0
+    p_idle, span, cap_w = params.p_idle_w, params.p_max_w - params.p_idle_w, engine.cap_f * params.p_max_w
+    jobs = engine.jobs
     for jid in sorted(engine.running):          # fixed order: the float sum must not depend on set order
-        j = engine.jobs[jid]
-        busy_w += j.gpus * gpu_power_w(params, j.util, engine.cap_f)
+        j = jobs[jid]
+        busy_w += j.gpus * min(p_idle + j.util * span, cap_w)        # same as gpu_power_w, inlined for speed
         busy_gpus += j.gpus
     idle_gpus = engine.G - busy_gpus
     total_w = busy_w + idle_gpus * params.p_idle_w + engine.G * params.h_idle_w + busy_gpus * params.h_busy_w
@@ -77,18 +79,22 @@ class PowerTracker:
     def __init__(self, params):
         self.params = params
         self.steps = []                          # (t, kW); the value holds until the next step
+        self._last_mut = None
 
     def attach(self, engine):
         engine.on_event = self.record
         self.record(engine, engine.now)
 
     def record(self, engine, t):
-        p = power_kw(engine, self.params)
         if self.steps:
             assert t >= self.steps[-1][0], "power steps must not go back in time"
-            if self.steps[-1][0] == t:           # several changes at one instant: keep the last
-                self.steps[-1] = (t, p)
+            if engine.mut == self._last_mut:     # power state unchanged (e.g. an arrival that only queued): no new step
                 return
+        self._last_mut = engine.mut
+        p = power_kw(engine, self.params)
+        if self.steps and self.steps[-1][0] == t:    # several changes at one instant: keep the last
+            self.steps[-1] = (t, p)
+            return
         self.steps.append((t, p))
 
     def power_at(self, t):

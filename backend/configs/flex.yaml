@@ -1,5 +1,5 @@
 # World for the paper simulator (backend/flex). Every number needs "# source: <ref>, accessed <date>" or "# ASSUMPTION".
-# Only the sections phase S1 needs; power, cloud, events etc. are added by later phases.
+# Sections are added phase by phase (S1 paths and seed, S3 power, S4 grid, S6 cloud and cost, S7 deadlines).
 
 paths:                  # relative to the repo root
   data: data            # ASSUMPTION (layout choice, not a number from a source)
@@ -11,6 +11,7 @@ check_every: 1000       # ASSUMPTION: full safety check every N events on large 
 
 synthetic:              # synthetic test data only, never used for paper numbers
   epoch0_utc: "2017-11-15T00:00:00+00:00"   # ASSUMPTION: UTC time of simulated t = 0 on synthetic runs (the Philly TEST_START date, so local-time rules behave alike)
+  days: 20              # ASSUMPTION: length of the synthetic trace used by the experiment runner (room for 10 event days)
   pool_gpus: 64         # ASSUMPTION: GPU pool size for synthetic runs (the Philly G comes from the machines table in S8)
 
 cloud:
@@ -59,3 +60,8 @@ cost:                     # cost of an event (D7)
   c_delay_factor: 1.0     # source: docs/track-2/SIM_PLAN.md D7 (c_delay = the cloud $/GPU-hour; sensitivity 0.5x and 2x), accessed 2026-11-13
   m: 1                    # source: docs/track-2/SIM_PLAN.md D7 (missed-deadline multiplier; sensitivity 0 and 3), accessed 2026-11-13
   w_fail: 0               # source: docs/track-2/SIM_PLAN.md D7 (delay weight of Failed/Killed jobs; sensitivity 1), accessed 2026-11-13
+
+deadlines:               # D12: a seeded random share of jobs gets deadline = submit + slack x wall_s
+  fraction: 0.3          # source: docs/track-2/SIM_PLAN.md D12, accessed 2026-11-13
+  slack_min: 2           # source: docs/track-2/SIM_PLAN.md D12 (slack ~ U(2, 4)), accessed 2026-11-13
+  slack_max: 4           # source: docs/track-2/SIM_PLAN.md D12, accessed 2026-11-13

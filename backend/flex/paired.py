@@ -42,27 +42,48 @@ def run_base(snapshot, event, params, h_after_s):
     return RunResult(eng, tracker)
 
 
-def make_gate(eng, params, t_end, p_star):
-    """D10: while now < t_end a job may start only if power after the start stays <= P*. Bound to `eng`."""
-    def admit(job):
-        return eng.now >= t_end or power_kw(eng, params) + start_delta_kw(params, job, eng.cap_f) <= p_star
-    return admit
+class Gate:
+    """D10: while now < t_end a job may start only if power after the start stays <= P*. Bound to `eng`.
+    With cache=True the current power is kept and raised by start_delta_kw on each admitted start;
+    it is recomputed after any other change of the power state (finish, suspend, burst, cap), seen via eng.mut."""
+
+    def __init__(self, eng, params, t_end, p_star, cache=True):
+        self.eng, self.params, self.t_end, self.p_star, self.cache = eng, params, t_end, p_star, cache
+        self.power, self.seen = 0.0, -1
+
+    def __call__(self, job):
+        eng = self.eng
+        if eng.now >= self.t_end:
+            return True
+        if not self.cache or self.seen != eng.mut:
+            self.power, self.seen = power_kw(eng, self.params), eng.mut
+        delta = start_delta_kw(self.params, job, eng.cap_f)
+        if self.power + delta <= self.p_star:
+            self.power, self.seen = self.power + delta, eng.mut + 1      # the engine starts the job right away
+            return True
+        return False
+
+
+def make_gate(eng, params, t_end, p_star, cache=True):
+    return Gate(eng, params, t_end, p_star, cache)
 
 
 def policy_none(eng, event, p_star, params):
     """Take no action; only the gate (installed by run_event) acts."""
 
 
-def run_event(snapshot, event, policy, params, p_star, h_after_s, restore_s):
+def run_event(snapshot, event, policy, params, p_star, h_after_s, restore_s, cloud_params=None):
     """Policy run. The gate is on during [t_s, t_e) unless the cut is 0 (no curtailment requested).
     At t_e the cap is lifted, suspended jobs resume (FCFS order, restore_s each) and the gate turns off."""
     eng, tracker = _restore(snapshot, params, event.t_end + h_after_s)
     assert eng.now == event.t_start, "snapshot must be taken at the event start"
+    if cloud_params is not None:             # the cloud of this run may differ from the baseline's (E2 sweeps)
+        eng.cloud.params = cloud_params
     if event.cut > 0:
         eng.admit = make_gate(eng, params, event.t_end, p_star)
     policy(eng, event, p_star, params)
     eng.run_until(event.t_end)
-    eng.admit = None
+    eng.admit = eng.on_hold = None
     if eng.cap_f < 1.0:
         eng.set_cap(1.0)
     for j in sorted((j for j in eng.jobs.values() if j.state == SUSPENDED), key=lambda j: (j.submit, j.job_id)):

@@ -7,8 +7,9 @@ from flex.metrics import COLUMNS, CostParams
 from flex.engine import Engine
 from flex.grid import Event, epoch_from_iso, generate_events, local_epoch, local_hour, to_local
 from flex.models import FJob, load_config
-from flex.paired import baseline_snapshots, policy_none, run_pair
-from flex.power import PowerParams, PowerTracker, make_speed_fn, params_from_config, power_kw
+from flex import paired
+from flex.paired import Gate, baseline_snapshots, policy_none, run_pair
+from flex.power import PowerParams, PowerTracker, make_speed_fn, params_from_config, power_kw, start_delta_kw
 from flex.policies import World, run_policy, world_from_config
 from flex.predictions import Predictions, load_predictions, oracle_values
 from traces.synthetic import generate, write_predictions
@@ -269,3 +270,77 @@ def test_three_policies_run_on_the_synthetic_default_event():
     assert rows["burst"]["n_burst"] > 0 and rows["burst"]["cloud_usd"] > 0 and rows["burst"]["n_suspended"] == 0
     assert rows["delay"]["n_suspended"] > 0 and rows["delay"]["cloud_usd"] == 0
     print({k: (round(v["compliance"], 3), round(v["shortfall_kw"], 2), v["usd_per_mwh"]) for k, v in rows.items()})
+
+
+def test_on_hold_fires_once_for_a_job_that_fits_but_the_gate_refuses():
+    # 2 GPUs, no host power, PUE 1: a busy GPU at u = 1 draws 250 W, an idle one 50 W.
+    pp = PowerParams(p_idle_w=50, p_max_w=250, h_idle_w=0, h_busy_w=0, pue=1.0, cloud_pue=1.0)
+    cp = CloudParams(price_per_gpu_h=3.0, boot_delay_s=300, migrate_s=120, min_billed_s=60, max_gpus=100)
+    jobs = [FJob("A", "u", 0, 1, 10 * H, "Pass", util=1.0), FJob("C", "u", 0, 1, 5400, "Pass", util=1.0),
+            FJob("B", "u", 4200, 1, 2 * H, "Pass", util=1.0)]
+    eng = Engine(jobs, G=2, check_every=1, cloud=Cloud(cp))
+    event = Event("hold", 1 * H, 2 * H, 1, 0.5)          # base power is 500 W all event long, so P* = 250 W
+    (_, snap), = list(baseline_snapshots(eng, [event.t_start]))
+    calls = []
+
+    def hold_burst(e, ev, p_star, params):               # no action at t_s; burst whatever the gate holds
+        e.on_hold = lambda job: (calls.append((job.job_id, e.now)), e.burst(job))
+
+    _, base, pol = run_pair(snap, event, hold_burst, pp, 24 * H, restore_s=0)
+    # B arrives at 4200 s with the pool full (A and C): it does not fit, so it is not burst then.
+    # C ends at 5400 s, B now fits (1 GPU free) but the gate refuses (300 W + 200 W > 250 W): burst once, at 5400 s.
+    assert calls == [("B", 5400)]
+    inst = pol.engine.cloud.instances
+    assert [(i.job_id, i.requested) for i in inst] == [("B", 5400)] and pol.engine.jobs["B"].on_cloud
+    assert not base.engine.jobs["B"].on_cloud
+
+
+def test_policy_kw_is_the_marginal_saving():
+    pp = PowerParams(p_idle_w=50, p_max_w=250, h_idle_w=100, h_busy_w=50, pue=1.3, cloud_pue=1.2)
+    for f in (1.0, 0.5):
+        jobs = [FJob("A", "u", 0, 2, 10 * H, "Pass", util=0.8), FJob("B", "u", 0, 1, 10 * H, "Pass", util=0.4)]
+        eng = Engine(jobs, G=4, check_every=1)
+        eng.run_until(1)
+        eng.set_cap(f, make_speed_fn(pp, [(0.3, 0.5), (1.0, 1.0)]))
+        before = power_kw(eng, pp)
+        saving = start_delta_kw(pp, eng.jobs["A"], eng.cap_f)
+        eng.suspend(eng.jobs["A"])
+        # pue x gpus x (gpu_power(u, f) - p_idle + h_busy) / 1000, and it equals the real drop in facility power
+        expect = 1.3 * 2 * (min(50 + 0.8 * 200, f * 250) - 50 + 50) / 1000
+        assert abs(saving - expect) < 1e-12 and abs((before - power_kw(eng, pp)) - saving) < 1e-12
+
+
+def test_gate_power_cache_gives_identical_results(monkeypatch):
+    cfg = load_config()
+    pp = params_from_config(cfg)
+    epoch0 = epoch_from_iso(cfg["synthetic"]["epoch0_utc"])
+    jobs = generate(random.Random(cfg["seed"]), days=6)
+    eng = Engine(jobs, 16, check_every=1000)                     # a small pool keeps a long queue
+    t_s = local_epoch(dt.date(2017, 11, 19), 17) - epoch0
+    event = Event("stress", t_s, t_s + 2 * H, 2, 0.2)
+    (_, snap), = list(baseline_snapshots(eng, [t_s]))
+    assert len(snap.queue) > 20                                  # the gate has something to hold
+    out = {}
+    for cache in (True, False):
+        monkeypatch.setattr(paired, "make_gate", lambda e, p, t, ps, cache=cache: Gate(e, p, t, ps, cache))
+        _, _, pol = run_pair(snap, event, policy_none, pp, 24 * H, restore_s=0)
+        out[cache] = (pol.end_times(), pol.tracker.steps)
+    assert out[True] == out[False]
+
+
+def test_oracle_mix_never_bursts_a_job_that_will_fail():
+    cfg = load_config()
+    epoch0 = epoch_from_iso(cfg["synthetic"]["epoch0_utc"])
+    jobs = generate(random.Random(cfg["seed"]), days=6)           # no deadlines: they could make a failing job worth saving
+    world = world_from_config(cfg, Predictions("oracle", {}))     # no rows: every lookup is the oracle value
+    assert world.cost.w_fail == 0
+    eng = Engine(jobs, cfg["synthetic"]["pool_gpus"], check_every=1000, cloud=Cloud(world.cloud))
+    starts = [local_epoch(dt.date(2017, 11, d), 17) - epoch0 for d in (18, 19)]
+    n_burst = 0
+    for t_s, snap in baseline_snapshots(eng, starts):
+        for ev in (Event("a", t_s, t_s + 2 * H, 2, 0.2), Event("b", t_s, t_s + 4 * H, 4, 0.3)):
+            _, _, pol = run_policy(snap, ev, "mix", world, "oracle", return_runs=True)
+            insts = pol.engine.cloud.instances
+            n_burst += len(insts)
+            assert all(pol.engine.jobs[i.job_id].status == "Pass" for i in insts)
+    assert n_burst > 0                                           # the check is not vacuous

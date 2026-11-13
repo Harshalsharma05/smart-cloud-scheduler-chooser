@@ -1,6 +1,7 @@
 """Philly-like SYNTHETIC jobs for testing the engine. Every number below is synthetic; none goes into the paper."""
 import bisect
 import math
+import random
 import statistics
 from pathlib import Path
 
@@ -53,6 +54,21 @@ def generate(rng, days=1.0, n_jobs=None):
                          util=rng.betavariate(*UTIL_BETA)))
         i += 1
     return jobs
+
+
+def assign_deadlines(jobs, rng, cfg):
+    """D12: a seeded random share of jobs gets deadline = submit + slack x wall_s, slack ~ U(slack_min, slack_max),
+    independent of status. cfg = flex.yaml `deadlines:`. Both draws are made for every job so the stream is stable."""
+    for j in jobs:
+        hit, slack = rng.random() < cfg["fraction"], rng.uniform(cfg["slack_min"], cfg["slack_max"])
+        j.deadline = int(j.submit + slack * j.wall_s) if hit else None
+    return jobs
+
+
+def synthetic_jobs(cfg):
+    """The synthetic trace the experiment runner uses: `days` of arrivals plus deadlines. Separate seeded streams."""
+    jobs = generate(random.Random(cfg["seed"]), days=cfg["synthetic"]["days"])
+    return assign_deadlines(jobs, random.Random(cfg["seed"] + 1), cfg["deadlines"])
 
 
 def write_predictions(jobs, out_dir):
@@ -110,6 +126,9 @@ if __name__ == "__main__":
     print(f"{len(jobs)} synthetic jobs, G={eng.G}, {eng.n_events} events, simulated {eng.now / 86400:.0f} days, "
           f"run time {time.perf_counter() - t0:.2f} s")
     if "--predictions" in sys.argv:      # python -m traces.synthetic --predictions
-        out = write_predictions(list(eng.jobs.values()),
+        exp_jobs = synthetic_jobs(cfg)   # the trace the experiment runner uses, simulated without events
+        base = Engine(exp_jobs, cfg["synthetic"]["pool_gpus"], check_every=cfg["check_every"])
+        base.run_to_drain()
+        out = write_predictions(list(base.jobs.values()),
                                 Path(__file__).resolve().parents[2] / cfg["paths"]["data"] / "synthetic" / "predictions")
-        print("wrote synthetic oracle.csv and last2.csv to", out)
+        print(f"wrote synthetic oracle.csv and last2.csv for {len(exp_jobs)} jobs to", out)

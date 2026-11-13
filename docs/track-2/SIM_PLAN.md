@@ -462,3 +462,30 @@ Each phase ends with the done-check, a short report, a commit, and a stop. Start
 - Helios trace (after 1 Dec).
 - Confidence intervals by bootstrap over events (now: median and IQR).
 - Using p10/p90 (risk-aware burst choice) instead of p50 only.
+
+---
+
+## How to run the pipeline (written at pause point P1, phase S7)
+
+All commands from `backend/` with the venv active (`.venv\Scriptsctivate`), except the figure scripts (repo root).
+Synthetic data only; no synthetic number goes into the paper. `--data philly` arrives with S8.
+
+```
+pytest -q                                                    # 4 demo tests + the flex tests
+python -m traces.synthetic --predictions                     # 20k-job timing, then synthetic oracle.csv and last2.csv
+python -m flex.experiments e1 --data synthetic --quick       # 3 events per cell; drop --quick for 10 per cell
+python -m flex.experiments e2 --data synthetic --quick       # cloud price x boot delay on the default event
+python -m flex.experiments e3 --data synthetic --quick       # burst selectors (missing prediction files are listed)
+python -m flex.experiments e4 --data synthetic --quick       # reads results/e1 (runs e1 first if absent)
+cd ..
+backend\.venv\Scripts\python paperiguresig_e1.py       # also fig_e2.py, fig_e3.py, fig_e4.py -> paper/figures/out/*.pdf
+```
+
+- Outputs: `results/<exp>/runs.csv` (one row per event x policy x setting, columns of section 4) and
+  `results/<exp>/summary.csv` (median, 25th and 75th percentile over events). `runtime_s` is one policy run;
+  the baseline continuation of an event is shared by its policies.
+- `--predictor <name>` reads `data/synthetic/predictions/<name>.csv` (synthetic) or `predictions/<name>.csv` (Philly).
+  `e1` adds `mix` with the oracle as the upper bound when `oracle.csv` exists. `e5` is phase S15.
+- Where things are: policies and the mix in `flex/policies.py`, cost metrics in `flex/metrics.py`, paired runs and the
+  gate in `flex/paired.py`, events in `flex/grid.py`, parameters in `configs/flex.yaml` (cloud values are still
+  `# ASSUMPTION`, replaced in S11).
