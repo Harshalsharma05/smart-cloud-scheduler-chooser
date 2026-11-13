@@ -86,7 +86,7 @@ def run_event(snapshot, event, policy, params, p_star, h_after_s, restore_s, clo
     eng.admit = eng.on_hold = None
     if eng.cap_f < 1.0:
         eng.set_cap(1.0)
-    for j in sorted((j for j in eng.jobs.values() if j.state == SUSPENDED), key=lambda j: (j.submit, j.job_id)):
+    for j in sorted((j for j in eng.jobs.values() if j.state == SUSPENDED), key=lambda j: (j.submit if j.submit_real is None else j.submit_real, j.job_id)):
         eng.resume(j, restore_s)
     eng.schedule()
     eng.run_to_drain()

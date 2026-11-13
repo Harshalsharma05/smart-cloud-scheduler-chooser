@@ -65,7 +65,7 @@ def shed_metrics(base_tracker, pol_tracker, event, h_after_s):
 COLUMNS = ["exp", "event_id", "t_start", "duration_h", "cut", "policy", "selector", "predictor", "setting", "target_kw",
            "base_mean_kw", "shed_mwh", "compliance", "shortfall_kw", "rebound_mwh", "cloud_usd", "cloud_gpu_h",
            "cloud_waste_fail_usd", "cloud_waste_short_usd", "dgpuh_good", "dgpuh_all", "missed_deadlines", "cost_usd",
-           "usd_per_mwh", "d_wait_min", "d_slowdown", "n_suspended", "n_burst", "cap_level", "runtime_s", "seed"]
+           "usd_per_mwh", "d_wait_min", "d_slowdown", "n_suspended", "n_burst", "cap_level", "pred_coverage", "runtime_s", "seed"]
 TAU_S = 10                   # bounded-slowdown threshold (standard definition)
 SHORT_EXTRA_S = 600          # a burst is "short" if the remaining runtime was < boot_delay + 10 min
 
@@ -82,10 +82,10 @@ def cost_params_from_config(cfg) -> CostParams:
 
 
 def _measured_jobs(base_eng, pol_eng):
-    """(base job, policy job) for every finished non-warm-up job present in both runs, in job_id order."""
+    """(base job, policy job) for every finished job present in both runs (warm-up and carry-over included), in job_id order."""
     for jid in sorted(base_eng.jobs):
         jb, jp = base_eng.jobs[jid], pol_eng.jobs.get(jid)
-        if jp is not None and not jb.warmup and jb.end is not None and jp.end is not None:
+        if jp is not None and jb.end is not None and jp.end is not None:
             yield jb, jp
 
 

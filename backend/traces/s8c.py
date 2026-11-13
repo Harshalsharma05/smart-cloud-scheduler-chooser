@@ -76,18 +76,20 @@ def long_carry(L, cfg):
 
 
 def policy_table(L, cfg, oracle, last2):
-    print("\n4. default event, delay and mix:")
-    cols = ["policy", "predictor", "shed_mwh", "compliance", "usd_per_mwh", "cost_usd", "cloud_usd", "n_suspended", "n_burst",
-            "dgpuh_good", "dgpuh_all", "missed_deadlines"]
+    """Default event, all four policies: oracle with w_fail 0 and 1, last2 with w_fail 1 (S8d)."""
+    print("\n4. default event:")
+    cols = ["policy", "shed_mwh", "compliance", "usd_per_mwh", "cost_usd", "cloud_usd", "n_suspended", "n_burst",
+            "dgpuh_good", "dgpuh_all", "missed_deadlines", "pred_coverage"]
     rows = []
-    for label, pred, name, wf in (("last2", last2, "last2", 0), ("oracle w_fail=1", oracle, "oracle", 1)):
+    for label, pred, name, wf in (("oracle w_fail=0", oracle, "oracle", 0), ("oracle w_fail=1", oracle, "oracle", 1),
+                                  ("last2 w_fail=1", last2, "last2", 1)):
         world = world_from_config(cfg, pred)
         world = dataclasses.replace(world, cost=dataclasses.replace(world.cost, w_fail=wf))
         ev, snap = event_setup(L, cfg, world)
         base = run_base(snap, ev, world.params, world.h_after_s)
-        for p in ("delay", "mix"):
+        for p in ("delay", "cap", "burst", "mix"):
             r = run_policy(snap, ev, p, world, name, "predictor", cfg["seed"], base)
-            rows.append(dict(setting=label, **{c: r[c] for c in cols if c != "predictor"}))
+            rows.append(dict(setting=label, **{c: r[c] for c in cols}))
     print(pd.DataFrame(rows).round(3).to_string(index=False))
 
 
@@ -96,9 +98,11 @@ def main():
     L = load_philly(cfg)
     oracle = load_predictions(ROOT / cfg["paths"]["predictions"] / "oracle.csv")
     last2 = load_predictions(ROOT / cfg["paths"]["predictions"] / "last2.csv")
-    burst_diagnostic(L, cfg, oracle)
-    capacity_sensitivity(L, cfg)
-    long_carry(L, cfg)
+    import sys
+    if "--all" in sys.argv:
+        burst_diagnostic(L, cfg, oracle)
+        capacity_sensitivity(L, cfg)
+        long_carry(L, cfg)
     policy_table(L, cfg, oracle, last2)
 
 

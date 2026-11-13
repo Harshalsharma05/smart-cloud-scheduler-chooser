@@ -22,6 +22,8 @@ class FJob:
     deadline: int | None = None
     warmup: bool = False
     carry: bool = False         # S8b: already running at the simulation start (pseudo-job submitted at t = 0)
+    elapsed0: int = 0           # carry-over: seconds already run before t = 0 (added to work_done for the prediction lookup)
+    submit_real: int | None = None   # carry-over: trace submit time relative to t = 0 (negative); used only for tie-breaks
     # runtime fields
     state: str = PENDING
     work_done: float = 0.0      # nominal seconds of progress (valid as of `mark`)

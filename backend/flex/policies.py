@@ -44,10 +44,10 @@ def world_from_config(cfg, predictor, curve_variant=None):
 # ---- per-job estimates (predictions only) ----
 
 def progress(eng, job):
-    """Nominal progress of a job right now (= elapsed time for the prediction lookup)."""
+    """Nominal progress of a job right now plus elapsed0 (= elapsed time for the prediction lookup)."""
     if job.state == RUNNING:
-        return job.work_done + job.speed * (eng.now - job.mark)
-    return job.work_done
+        return job.elapsed0 + job.work_done + job.speed * (eng.now - job.mark)
+    return job.elapsed0 + job.work_done
 
 
 def _info(eng, world, selector, job, event):
@@ -83,18 +83,23 @@ def event_rng(seed, event):
     return random.Random(f"{seed}:{event.event_id}:{event.t_start}")
 
 
+def tie_key(job):
+    """Tie-break key (submit time, job_id); carry-over jobs use their trace submit time."""
+    return (job.submit if job.submit_real is None else job.submit_real, job.job_id)
+
+
 def _order(jobs, selector, rng, cost_per_kw):
     """Candidates in the order the selector wants them acted on. cost_per_kw(job) is used by "predictor" only."""
     if selector == "none-largest":
-        return sorted(jobs, key=lambda j: (-j.gpus, j.job_id))
+        return sorted(jobs, key=lambda j: (-j.gpus,) + tie_key(j))
     if selector == "random":
-        keyed = [(rng.random(), j.job_id, j) for j in sorted(jobs, key=lambda j: j.job_id)]
+        keyed = [(rng.random(), tie_key(j), j) for j in sorted(jobs, key=tie_key)]
         return [j for _, _, j in sorted(keyed, key=lambda x: x[:2])]
-    return sorted(jobs, key=lambda j: (cost_per_kw(j), j.job_id))
+    return sorted(jobs, key=lambda j: (cost_per_kw(j),) + tie_key(j))
 
 
 def _running_jobs(eng):
-    return [eng.jobs[jid] for jid in sorted(eng.running)]
+    return sorted((eng.jobs[jid] for jid in eng.running), key=tie_key)
 
 
 def _power_under_cap(eng, params, f):
@@ -212,6 +217,9 @@ def run_policy(snapshot, event, name, world, predictor_name="", selector="predic
     shed = shed_metrics(base.tracker, pol.tracker, event, world.h_after_s)
     row = event_row(event, shed, base.engine, pol.engine, world.cost, world.cloud.boot_delay_s, name,
                     predictor_name if name in USES_PREDICTOR else "")
+    if name in USES_PREDICTOR and selector == "predictor":     # share of running GPUs whose job has a real prediction row
+        run = [snapshot.jobs[i] for i in snapshot.running]
+        row["pred_coverage"] = sum(j.gpus for j in run if j.job_id in world.predictor.rows) / max(1, sum(j.gpus for j in run))
     if name in USES_SELECTOR:
         row["selector"] = f"predictor:{predictor_name}" if selector == "predictor" else selector
     return (row, base, pol) if return_runs else row

@@ -19,7 +19,7 @@ FLOOR_S = 60
 
 def oracle_values(job, elapsed):
     """Oracle prediction for a job from its own ground truth: (p10, p50, p90, p_fail, p_cancel)."""
-    rt = max(FLOOR_S, job.wall_s - elapsed)
+    rt = max(FLOOR_S, job.wall_s + job.elapsed0 - elapsed)       # elapsed includes elapsed0
     return rt, rt, rt, float(job.status == "Failed"), float(job.status == "Killed")
 
 

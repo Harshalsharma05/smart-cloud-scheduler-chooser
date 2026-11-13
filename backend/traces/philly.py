@@ -7,11 +7,13 @@ Decisions (S8):
 - Warm-up: every job with submit in [epoch0, TEST_END) is loaded; those with submit < TEST_START get warmup=True
   (no deadline, excluded from metrics). Jobs submitted before epoch0 are ignored (counted and reported).
   Warm-up jobs and censored jobs have no prediction rows, so predictors fall back to oracle values (counted).
-- Carry-over (S8b): a job with first_start < epoch0 < end is a pseudo-job "#carry:<job_id>" submitted at t = 0 with
-  wall_s = end - epoch0 (end = first_start + wall_s; trace end for censored jobs), warmup=True, carry=True. Its id sorts
-  before every real id, so it starts at t = 0 before any other job. If the carry-overs exceed G, the latest-started
-  ones are dropped (counted). The pseudo id has no prediction rows, so predictors use oracle values for it.
-  Jobs submitted before epoch0 that start after epoch0 are still ignored (counted, not simulated).
+- Carry-over (S8b/S8d): a job with first_start < epoch0 < end keeps its real job_id and becomes a job submitted at t = 0
+  with wall_s = end - epoch0 (end = first_start + wall_s; trace end for censored jobs), warmup=True, carry=True,
+  elapsed0 = epoch0 - first_start (added to work_done for the prediction lookup, so rows of the real job apply),
+  submit_real = its trace submit time (tie-breaks only). If the carry-overs exceed G, the latest-started ones are dropped
+  (counted). Jobs submitted before epoch0 that start after epoch0 are still ignored (counted, not simulated).
+- Censored jobs (end not observed) have no known outcome. Their trace status is not an outcome, so they are given
+  status "Pass" (useful work) in the cost metrics and in the oracle p_fail / p_cancel. Their trace statuses are reported.
 - Dropped: never_started jobs, jobs with 0 GPUs, jobs with wall_s <= 0 (all counted in the report).
   Censored jobs (no end) are kept with wall_s = (last end_time in the log) - first_start_time.
 - Deadlines: D12, only for test-window jobs, drawn in (submit, job_id) order from Random(seed + 1).
@@ -75,6 +77,8 @@ def load_philly(cfg=None):
     d = d[d["num_gpus"] > 0].copy()
     d["wall_s"] = d["wall_s"].where(~d["censored"], last_end - d["first_start_time"])   # censored: observed so far
     rep["censored_kept"] = int(d["censored"].sum())
+    rep["censored_trace_status"] = d[d["censored"]]["status"].value_counts().to_dict()
+    d["status"] = d["status"].where(~d["censored"], "Pass")          # no observed outcome: treat as useful
     rep["wall_nonpositive_dropped"] = int((d["wall_s"] <= 0).sum())
     d = d[d["wall_s"] > 0]
     rep["gpus_above_G"] = int((d["num_gpus"] > G).sum())
@@ -94,8 +98,9 @@ def load_philly(cfg=None):
         if used + r.num_gpus > G:
             continue
         used += int(r.num_gpus)
-        carry.append(FJob(job_id=f"#carry:{r.job_id}", user=r.user, submit=0, gpus=int(r.num_gpus), wall_s=int(r.remaining),
-                          status=r.status, util=float(cfg["philly"]["util_default"]), warmup=True, carry=True))
+        carry.append(FJob(job_id=r.job_id, user=r.user, submit=0, gpus=int(r.num_gpus), wall_s=int(r.remaining),
+                          status=r.status, util=float(cfg["philly"]["util_default"]), warmup=True, carry=True,
+                          elapsed0=int(epoch0 - r.first_start_time), submit_real=int(r.submit_time - epoch0)))
     rep["carry_jobs"] = len(carry)
     rep["carry_gpus"] = used
     rep["carry_truncated"] = len(running) - len(carry)
@@ -117,7 +122,7 @@ def load_philly(cfg=None):
                  wall_s=int(r.wall_s), status=r.status, util=float(u_), warmup=bool(r.submit_time < test_start_utc))
             for r, u_ in zip(d.itertuples(index=False), util)]
     for c in carry:                                         # carry-overs use the measured util too (when it exists)
-        c.util = float(umap.get(c.job_id.removeprefix("#carry:"), c.util))
+        c.util = float(umap.get(c.job_id, c.util))
     jobs = carry + jobs
     test_jobs = [j for j in jobs if not j.warmup]
     assign_deadlines(test_jobs, random.Random(cfg["seed"] + 1), cfg["deadlines"])    # already in (submit, job_id) order
