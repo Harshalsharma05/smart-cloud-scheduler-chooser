@@ -76,7 +76,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 - [x] **14. [T2] S6 Single-action policies and cost metrics** (4 h).
 - [x] **15. [T2] S7 Controller, selectors, experiment runner** (3-4 h). **Pause point P1**: the whole pipeline works
       on synthetic data.
-- [ ] **16. [T2] W0 Paper LaTeX skeleton** (1.5 h). Small; fits here.
+- [x] **16. [T2] W0 Paper LaTeX skeleton** (1.5 h). Small; fits here. (Build not yet verified: no LaTeX on this PC.)
 
 ### Block F: real results for the abstract (~6-8 h)
 
@@ -200,3 +200,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 13 (T3b) | dc3a1a2 | tf_v1 trained locally (9 epochs, best val loss 1.3243); val pinball 0.440 vs last2 1.003, val status log-loss 0.858 vs 1.206 |
 | 2026-11-13 | 14 (S6) | 366607c | flex/policies.py (delay/cap/burst-only, gating hook on_hold) + D7 cost, waste and user-impact metrics + result row; cloud/cost params in flex.yaml (cloud values ASSUMPTION); 16 tests pass |
 | 2026-11-13 | 15 (S7) | 6e25d7e | mix controller + selectors (flex/policies.py), flex/experiments.py (e1-e4 synthetic quick runs: e1 19 s), 4 figure scripts, gate power cache (800-GPU stress 4.7 s -> 2.3 s), on_hold rule; P1 reached; 20 tests pass |
+| 2026-11-13 | 16 (W0) | pending | paper/main.tex (IEEEtran, anonymous), 9 section files with page budgets, refs.bib empty, numbers.tex stub, README; PDF build NOT verified (no LaTeX installed) |
