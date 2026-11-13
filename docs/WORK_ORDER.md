@@ -49,6 +49,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 ### Block B: data and the simple predictors (~8-10 h)
 
 - [x] **5. [T1] T1 Clean the Philly job log** (3-4 h; needs step 2 finished).
+- [x] **5b. [T1] T1 fixup: machine GPU counts from util width** (G = 2,892).
       **→ Track 2 chat:** "philly_jobs / attempts / machines parquet ready", plus the T1 report numbers
       (job counts, test window, GPU memory sizes).
 - [x] **6. [T1] T2 Training examples and time split** (3-4 h).
@@ -213,3 +214,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 18 (S11) | bae65cc | flex.yaml: p_idle 70, PUE 1.58, cloud PUE 1.09, price 3.06, boot 300 sourced; host power, migrate/restore, cap-curve points still ASSUMPTION; paper/tables/params.tex generated |
 | 2026-11-13 | 7b (T2c) | ad2c5f1 | export keys = valid jobs overlapping [2017-11-08, 2017-12-16): 37,262 jobs, 111,451 rows; oracle + last2 pass checker; 4 tests pass |
 | 2026-11-13 | 27 (S9) | 000da99 | philly_job_util.parquet: 37,264 of 37,296 jobs measured (99.9%), 119 s full run; job util mean 0.287 / p50 0.195, minute-weighted 0.558 (now the fallback); cap shed 0.067 -> 0.196 MWh, still compliance 0; FOUND: philly_machines.parquet GPU counts swapped vs util file (G 2490 vs 3030?) |
+| 2026-11-13 | 5b (T1 fixup) | ab64a41 | philly_machines num_gpus derived from util width: 150x2, 156x4, 246x8, G = 2,892; 0 attempt violations (415 verified, 137 util-only); jobs/attempts unchanged (117,325 / 152,714, sum num_gpus 195,296) |
