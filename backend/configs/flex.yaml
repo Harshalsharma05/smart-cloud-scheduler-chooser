@@ -71,3 +71,4 @@ deadlines:               # D12: a seeded random share of jobs gets deadline = su
 philly:                  # real-trace loader (S8)
   warmup_days: 7         # ASSUMPTION: the simulation starts this many days before TEST_START so the queue and pool are filled by the window start
   util_default: 0.5      # ASSUMPTION: used for every job only when philly_job_util.parquet (S9) is absent; otherwise unmeasured jobs get the measured cluster average
+  pool_gpus: auto        # derived: median non-NA GPU count per minute over the test window (cluster_gpu_util, S9c); an integer overrides it (used for the sensitivity). Derived from the trace, not tuned on waits.

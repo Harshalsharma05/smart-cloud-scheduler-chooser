@@ -1,6 +1,11 @@
 """Philly jobs for the engine (SIM_PLAN S8). Reads data/processed/philly_jobs.parquet, philly_machines.parquet and
 (optional) philly_job_util.parquet (S9); TEST_START / TEST_END come from ml/config.py (TEST_END is exclusive).
 
+Pool (S9c): the engine gets ONE number G for scheduling and for power (idle GPUs, host power). With philly.pool_gpus: auto it is
+the median number of GPUs reporting a non-NA utilisation value per minute over the test window (philly_pool.py). It is
+derived from the trace, not tuned on waits; the 132 four-GPU machines with no rows in cluster_gpu_util are not in it.
+An integer overrides it (sensitivity). The installed GPU count (machines table) is only logged.
+
 Decisions (S8):
 - Time: job-log times are UTC epoch seconds. Simulated t = epoch - epoch0, epoch0 = TEST_START - warmup_days (flex.yaml).
   Local time for events (America/Los_Angeles) is done by flex.grid.
@@ -65,7 +70,14 @@ def load_philly(cfg=None):
     machines = pd.read_parquet(data / "philly_machines.parquet")
     check_columns(raw, JOB_COLUMNS, "philly_jobs.parquet")
     check_columns(machines, ["machine_id", "num_gpus"], "philly_machines.parquet")
-    G = int(machines["num_gpus"].sum())
+    G_installed = int(machines["num_gpus"].sum())
+    pool_cfg = cfg["philly"].get("pool_gpus", "auto")
+    if pool_cfg == "auto":                                   # S9c: GPUs that report a value in the trace (derived, not tuned)
+        from traces.philly_pool import load_pool
+        G = int(load_pool()["pool_gpus"])
+    else:
+        G = int(pool_cfg)
+    print(f"pool G = {G} GPUs (philly.pool_gpus = {pool_cfg}); installed = {G_installed}")
 
     test_start_utc, test_end_utc = utc_epoch(mc.TEST_START), utc_epoch(mc.TEST_END)
     epoch0 = test_start_utc - int(cfg["philly"]["warmup_days"]) * 86400
@@ -90,6 +102,7 @@ def load_philly(cfg=None):
     d["status"] = d["status"].where(~d["censored"], "Pass")          # no observed outcome: treat as useful
     rep["wall_nonpositive_dropped"] = int((d["wall_s"] <= 0).sum())
     d = d[d["wall_s"] > 0]
+    rep["pool_gpus"], rep["installed_gpus"] = G, G_installed
     rep["gpus_above_G"] = int((d["num_gpus"] > G).sum())
 
     # jobs submitted before epoch0 are ignored; say how many were still running then
@@ -134,7 +147,7 @@ def load_philly(cfg=None):
                test_jobs=len(test_jobs), G=G)
     real = d.set_index("job_id")[["first_start_time", "run_s", "censored"]]       # real timings, for sanity checks only
     all_started = raw[~raw["never_started"] & (raw["num_gpus"] > 0)]          # for the real busy-GPU curve
-    return dict(jobs=jobs, G=G, epoch0=epoch0, test_start_utc=test_start_utc, test_end_utc=test_end_utc, all_started=all_started,
+    return dict(jobs=jobs, G=G, G_installed=G_installed, epoch0=epoch0, test_start_utc=test_start_utc, test_end_utc=test_end_utc, all_started=all_started,
                 last_end=last_end, test_start=test_start, test_end=test_end, events=events,
                 util_source=util_source, report=rep, real=real)
 
@@ -190,7 +203,7 @@ def main():
     t0 = time.perf_counter()
     L = load_philly(cfg)
     print(f"load: {time.perf_counter() - t0:.1f} s")
-    print(f"  G = {L['G']} GPUs (sum of num_gpus in philly_machines.parquet)")
+    print(f"  G (pool) = {L['G']} GPUs, installed = {L['G_installed']}")
     for k, v in L["report"].items():
         print(f"  {k}: {v}")
     print("  util:", L["util_source"])

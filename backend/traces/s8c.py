@@ -48,13 +48,14 @@ def burst_diagnostic(L, cfg, oracle):
 def capacity_sensitivity(L, cfg):
     ts, te = L["test_start"], L["test_end"]
     out = []
-    for f in (1.0, 0.9, 0.8, 0.7):
-        eng = Engine(copy.deepcopy(L["jobs"]), int(round(f * L["G"])), check_every=cfg["check_every"])
+    auto = L["G"]                                    # S9c: pools = installed, auto, 0.9 x auto, 0.8 x auto
+    for label, g in (("installed", L["G_installed"]), ("auto", auto), ("0.9 auto", int(round(0.9 * auto))), ("0.8 auto", int(round(0.8 * auto)))):
+        eng = Engine(copy.deepcopy(L["jobs"]), g, check_every=cfg["check_every"])
         eng.run_to_drain()
         segs = [(s, e, j.gpus) for j in eng.jobs.values() for s, e, w, _ in j.segments if w == "onprem"]
         busy = _busy_per_minute([x[0] for x in segs], [x[1] for x in segs], [x[2] for x in segs], ts, te)
         w = np.array([j.first_start - j.submit for j in eng.jobs.values() if not j.warmup], dtype=float)
-        out.append(dict(pool_factor=f, pool_gpus=eng.G, busy_gpus_mean=busy.mean(), wait_mean_min=w.mean() / 60,
+        out.append(dict(pool=label, pool_gpus=eng.G, busy_gpus_mean=busy.mean(), wait_mean_min=w.mean() / 60,
                         wait_p50_min=np.percentile(w, 50) / 60, wait_p90_min=np.percentile(w, 90) / 60, frac_wait_gt_60s=(w > 60).mean()))
     df = pd.DataFrame(out).round(3)
     path = ROOT / "results" / "philly_baseline"
@@ -96,7 +97,7 @@ def policy_table(L, cfg, oracle, last2):
 def main():
     cfg = load_config()
     L = load_philly(cfg)
-    print(f"G = {L['G']} GPUs (from philly_machines.parquet)")
+    print(f"G (pool) = {L['G']} GPUs, installed {L['G_installed']}")
     oracle = load_predictions(ROOT / cfg["paths"]["predictions"] / "oracle.csv")
     last2 = load_predictions(ROOT / cfg["paths"]["predictions"] / "last2.csv")
     import sys
