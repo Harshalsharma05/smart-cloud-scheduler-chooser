@@ -106,7 +106,7 @@ does not depend on them.
       pass the checker; E3 can run".
 - [ ] **23. [T2] S10 Motivation charts** (2 h).
 - [ ] **24. [T2] S14 E3 predictor comparison** (2 h).
-- [ ] **25. [T2] S13 E2 sweeps + sensitivity** (2 h; reduced grid is fine).
+- [x] **25. [T2] S13 E2 sweeps + sensitivity** (2 h; reduced grid is fine).
 - [ ] **26. [T2] S15 E5 carbon** (1.5 h; **trim**: one paragraph if short of time).
 - [x] **27. [T2] S9 Utilisation join** (3-5 h; **trim**: skip and keep the cluster-average fallback if short of time).
       If done, re-run step 19 quickly so E1 uses real utilisation.
@@ -222,3 +222,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-14 | 17f (S9c) | 663eeff | philly.pool_gpus: auto = 2,300 (median non-NA GPUs/min, test window; 132 four-GPU machines have no util rows and no attempts); baseline sim util 0.722 vs real 0.720 (of pool), wait mean 80 vs 175 min, p90 326 vs 45; default event delay now $629/MWh (w_fail 0), 20 tests pass |
 | 2026-11-14 | 19 (S12) | a2afe3a | E1 Philly (pool 2,300, last2 + oracle delay/mix): 540 policy rows + 90 baselines in 1,352 s; delay is cheapest compliant policy in every cell with last2 (median 2.1-4.7 k$/MWh); mix(last2) costs a median 32x delay; mix+oracle wins 7 of 9 cells at w_fail=0; cap complies in 5 of 90 events, burst fails every 30% event; F1/F6/F9/T2 made |
 | 2026-11-14 | 19b (S12b) | 5447a28 | burst hits the 1,000-GPU cloud cap in all 30 events at 30% (3000 -> compliant, 100% of target, same $/MWh order); 30%-cut events 8, 9: P* 578-604 kW < floor 618 kW (infeasible); mix(last2) bursts jobs predicted at the 60 s floor (95-98%) whose actual remaining is median 25-30 h: $46k-125k billed vs $70-150 predicted |
+| 2026-11-14 | 25 (S13) | pending | sweeps on the 10 default-cell events: A price x boot (600 rows), B pool x price x cap (1,000 rows, 4 pools), T4 11 perturbations (550 rows); 26 min wall with 3 processes; no infeasible events in this cell; w_fail 0: mix+oracle wins every cell, w_fail 1: delay wins (mix+oracle within 1-5%) except spot price/installed pool; mix(last2) and burst never beat delay (0 of 10 events, 3 at 0.9 x auto + spot); cap 1000 vs 3000 identical for delay/mix |

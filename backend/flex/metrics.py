@@ -65,7 +65,7 @@ def shed_metrics(base_tracker, pol_tracker, event, h_after_s):
 COLUMNS = ["exp", "event_id", "t_start", "duration_h", "cut", "policy", "selector", "predictor", "setting", "target_kw",
            "base_mean_kw", "shed_mwh", "compliance", "shortfall_kw", "rebound_mwh", "cloud_usd", "cloud_gpu_h",
            "cloud_waste_fail_usd", "cloud_waste_short_usd", "dgpuh_good", "dgpuh_all", "missed_deadlines", "cost_usd",
-           "usd_per_mwh", "cost_usd_wfail1", "usd_per_mwh_wfail1", "compliance_ok", "d_wait_min", "d_slowdown", "n_suspended", "n_burst", "cap_level", "pred_coverage", "runtime_s", "seed"]
+           "usd_per_mwh", "cost_usd_wfail1", "usd_per_mwh_wfail1", "compliance_ok", "feasible", "d_wait_min", "d_slowdown", "n_suspended", "n_burst", "cap_level", "pred_coverage", "runtime_s", "seed"]
 TAU_S = 10                   # bounded-slowdown threshold (standard definition)
 SHORT_EXTRA_S = 600          # a burst is "short" if the remaining runtime was < boot_delay + 10 min
 

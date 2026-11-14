@@ -48,7 +48,8 @@ def load_setup(cfg, data, quick):
         if quick:
             cfg["grid"]["events_per_cell"] = 3
         L = load_philly(cfg)
-        print(f"Philly: {len(L['jobs'])} jobs, pool G = {L['G']} (installed {L['G_installed']}), {len(L['events'])} events")
+        print(f"Philly: {len(L['jobs'])} jobs, pool G = {L['G']} (installed {L['G_installed']}), {len(L['events'])} events; "
+              f"carry-over {L['report']['carry_jobs']} jobs, truncated {L['report']['carry_truncated']}")
         return cfg, L["jobs"], L["G"], L["events"]
     from traces.synthetic import synthetic_jobs, write_predictions
     cfg = copy.deepcopy(cfg)
@@ -101,10 +102,17 @@ def run_events(cfg, jobs, pool, world, events, per_event, label):
     return rows
 
 
-def timed_row(cfg, exp, snap, ev, name, world, base, predictor_name="", selector="predictor", setting=""):
+def floor_kw(params, G):
+    """Lowest facility power: every GPU idle, host idle power, times PUE (nothing running on-prem)."""
+    return params.pue * G * (params.p_idle_w + params.h_idle_w) / 1000.0
+
+
+def timed_row(cfg, exp, snap, ev, name, world, base, predictor_name="", selector="predictor", setting="", pool=None):
     t = time.perf_counter()
     row = run_policy(snap, ev, name, world, predictor_name, selector, cfg["seed"], base)
     row.update(exp=exp, setting=setting, runtime_s=round(time.perf_counter() - t, 3), seed=cfg["seed"])
+    if pool is not None:                                       # S13: P* below the all-idle floor cannot be met by any policy
+        row["feasible"] = bool(row["target_kw"] >= floor_kw(world.params, pool) - 1e-9)
     return row
 
 
@@ -123,25 +131,111 @@ def e1(cfg, jobs, pool, events, predictors, predictor, quick):
     return run_events(cfg, jobs, pool, world, events, per_event, "e1")
 
 
+PRICES = [0.43, 1.5, 3.06, 6.12]      # USD per GPU-h: spot (S11 source), 0.5x, base, 2x
+BOOTS = [60, 300, 900]
+CAPS = [1000, 3000]
+
+
+def setting_text(pool, price, boot, cap):
+    return f"pool={pool};price={price};boot={boot};cap={cap}"
+
+
+def cloud_variant(world, price, boot, cap):
+    return dataclasses.replace(world, cloud=dataclasses.replace(world.cloud, price_per_gpu_h=price, boot_delay_s=boot, max_gpus=cap))
+
+
+def policy_rows(cfg, exp, snap, ev, base, world, predictors, pool, price, boot, cap):
+    """burst (last2), mix (last2), mix (oracle) for one cloud setting."""
+    w, o = cloud_variant(world, price, boot, cap), cloud_variant(dataclasses.replace(world, predictor=predictors["oracle"]), price, boot, cap)
+    st = setting_text(pool, price, boot, cap)
+    return [timed_row(cfg, exp, snap, ev, "burst", w, base, "last2", setting=st, pool=pool),
+            timed_row(cfg, exp, snap, ev, "mix", w, base, "last2", setting=st, pool=pool),
+            timed_row(cfg, exp, snap, ev, "mix", o, base, "oracle", setting=st, pool=pool)]
+
+
+def delay_rows(cfg, exp, snap, ev, base, world, predictors, pool, settings):
+    """delay (last2) and delay (oracle) do not depend on the cloud: run once, copy to every setting."""
+    out = []
+    for pname in ("last2", "oracle"):
+        w = dataclasses.replace(world, predictor=predictors[pname])
+        r = timed_row(cfg, exp, snap, ev, "delay", w, base, pname, pool=pool)
+        out += [dict(r, setting=st) for st in settings]
+    return out
+
+
 def e2(cfg, jobs, pool, events, predictors, predictor, quick):
-    """Default event: cloud price x boot delay. delay and cap do not depend on the cloud, so they run once per event.
-    c_delay stays at its default (the base cloud price) while the cloud price is swept."""
+    """S13 sweep A, default cell (all 10 events): price x boot delay for delay, burst, mix+last2, mix+oracle (and delay+oracle).
+    c_delay stays at its default (3.06 $/GPU-h) while the cloud price is swept. Pool = auto, cloud cap 1000."""
     world = world_from_config(cfg, predictors[predictor])
-    price_factors, boots = ([0.5, 1, 2], [60, 300]) if quick else ([0.25, 0.5, 1, 2, 4], [60, 300, 900])
-    settings = [(pf, b) for pf in price_factors for b in boots]
-    label = lambda pf, b: f"price_x{pf}_boot{b}"
+    prices, boots = ([1.5, 3.06], [60, 300]) if quick else (PRICES, BOOTS)
+    settings = [(p, b) for p in prices for b in boots]
 
     def per_event(snap, ev, base):
-        rows = []
-        for name in ("delay", "cap"):
-            r = timed_row(cfg, "e2", snap, ev, name, world, base, predictor)
-            rows += [dict(r, setting=label(pf, b)) for pf, b in settings]
-        for pf, b in settings:
-            cp = dataclasses.replace(world.cloud, price_per_gpu_h=world.cloud.price_per_gpu_h * pf, boot_delay_s=b)
-            w = dataclasses.replace(world, cloud=cp)
-            rows += [timed_row(cfg, "e2", snap, ev, n, w, base, predictor, setting=label(pf, b)) for n in ("burst", "mix")]
+        rows = delay_rows(cfg, "e2", snap, ev, base, world, predictors, pool, [setting_text(pool, p, b, 1000) for p, b in settings])
+        for p, b in settings:
+            rows += policy_rows(cfg, "e2", snap, ev, base, world, predictors, pool, p, b, 1000)
         return rows
     return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "e2")
+
+
+def e2b(cfg, jobs, pool, events, predictors, predictor, quick):
+    """S13 sweep B for ONE pool (the pool comes from philly.pool_gpus, set by --pool): price x cloud cap at boot 300 s.
+    Cap 1000 at four prices (pool x price map) and cap 3000 at the base price (saturation). w_fail 0 / 1 are both in the rows."""
+    world = world_from_config(cfg, predictors[predictor])
+    base_price = cfg["cloud"]["price_per_gpu_h"]
+    boot = cfg["cloud"]["boot_delay_s"]
+    combos = [(p, boot, 1000) for p in PRICES] + [(base_price, boot, 3000)]
+
+    def per_event(snap, ev, base):
+        rows = delay_rows(cfg, "e2b", snap, ev, base, world, predictors, pool, [setting_text(pool, p, b, c) for p, b, c in combos])
+        for p, b, c in combos:
+            rows += policy_rows(cfg, "e2b", snap, ev, base, world, predictors, pool, p, b, c)
+        return rows
+    return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "e2b")
+
+
+def perturbations(cfg):
+    """T4: name -> (changed cfg copy, cap curve variant). One change at a time; defaults are in the sweep-A cell price 3.06 / boot 300."""
+    def mod(fn, variant=None):
+        c = copy.deepcopy(cfg)
+        fn(c)
+        return c, variant
+    P = {}
+    for m in (0, 3):
+        P[f"m={m}"] = mod(lambda c, m=m: c["cost"].__setitem__("m", m))
+    for f in (0.5, 2):
+        P[f"c_delay x{f}"] = mod(lambda c, f=f: c["cost"].__setitem__("c_delay_factor", f))
+    P["pessimistic cap curve"] = mod(lambda c: None, "pessimistic")
+    P["p_idle 40 W"] = mod(lambda c: c["power"].__setitem__("p_idle_w", 40))       # 70 W is the default
+    for f in (0.5, 1.5):
+        P[f"host power x{f}"] = mod(lambda c, f=f: (c["power"].__setitem__("h_idle_w", c["power"]["h_idle_w"] * f),
+                                                    c["power"].__setitem__("h_busy_w", c["power"]["h_busy_w"] * f)))
+    P["PUE 1.3"] = mod(lambda c: c["power"].__setitem__("pue", 1.3))               # 1.58 is the default
+    for f in (0.5, 2):
+        P[f"migrate/restore x{f}"] = mod(lambda c, f=f: (c["cloud"].__setitem__("migrate_s", int(c["cloud"]["migrate_s"] * f)),
+                                                        c["cloud"].__setitem__("restore_s", int(c["cloud"]["restore_s"] * f))))
+    return P
+
+
+def t4(cfg, jobs, pool, events, predictors, predictor, quick, only=None):
+    """S13 T4: delay, burst, mix+last2, mix+oracle (and delay+oracle) on the default cell under each perturbation."""
+    perts = {k: v for k, v in perturbations(cfg).items() if only is None or k in only}
+
+    def per_event(snap, ev, base0):
+        rows = []
+        for name, (c, variant) in perts.items():
+            world = world_from_config(c, predictors[predictor], variant)
+            base = run_base(snap, ev, world.params, world.h_after_s)
+            st = f"pert={name}"
+            for pname in ("last2", "oracle"):
+                w = dataclasses.replace(world, predictor=predictors[pname])
+                rows.append(timed_row(c, "t4", snap, ev, "delay", w, base, pname, setting=st, pool=pool))
+                if pname == "last2":
+                    rows.append(timed_row(c, "t4", snap, ev, "burst", w, base, pname, setting=st, pool=pool))
+                rows.append(timed_row(c, "t4", snap, ev, "mix", w, base, pname, setting=st, pool=pool))
+        return rows
+    world = world_from_config(cfg, predictors[predictor])
+    return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "t4")
 
 
 def e3(cfg, jobs, pool, events, predictors, predictor, quick):
@@ -216,13 +310,31 @@ def e4_from_e1(out_dir, summary_only=False):
     return runs
 
 
+def baseline_waits(cfg, jobs, pool, out_dir, label):
+    """Baseline (no event) wait of the test-window jobs for this pool: mean, p50, p90 (min) and share waiting > 60 s."""
+    import numpy as np
+    eng = Engine(copy.deepcopy(jobs), pool, check_every=cfg["check_every"])
+    eng.run_to_drain()
+    w = np.array([j.first_start - j.submit for j in eng.jobs.values() if not j.warmup], dtype=float)
+    row = dict(pool=label, pool_gpus=pool, jobs=len(w), wait_mean_min=w.mean() / 60, wait_p50_min=np.percentile(w, 50) / 60,
+               wait_p90_min=np.percentile(w, 90) / 60, frac_wait_gt_60s=float((w > 60).mean()),
+               carry_jobs=sum(j.carry for j in jobs), carry_gpus=sum(j.gpus for j in jobs if j.carry))
+    out = Path(out_dir) / "e2b"
+    out.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([row]).round(3).to_csv(out / f"baseline_{label}.csv", index=False)
+    print("baseline waits:", {k: (round(v, 2) if isinstance(v, float) else v) for k, v in row.items()})
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m flex.experiments")
-    ap.add_argument("exp", choices=["e1", "e2", "e3", "e4", "e5"])
+    ap.add_argument("exp", choices=["e1", "e2", "e2b", "e3", "e4", "e5", "t4"])
     ap.add_argument("--data", choices=["synthetic", "philly"], required=True)
     ap.add_argument("--predictor", default="last2")
     ap.add_argument("--quick", action="store_true", help="3 events per cell (and smaller sweeps)")
     ap.add_argument("--out", default=None, help="results directory (default: <repo>/results)")
+    ap.add_argument("--pool", default=None, help="e2b: installed | auto | 0.95 | 0.9 (x auto); sets philly.pool_gpus")
+    ap.add_argument("--only", default=None, help="t4: perturbation names separated by |")
+    ap.add_argument("--tag", default="", help="suffix of the runs file for split runs (runs_<tag>.csv)")
     args = ap.parse_args(argv)
     cfg = load_config()
     out_dir = Path(args.out) if args.out else ROOT / cfg["paths"]["results"]
@@ -235,12 +347,29 @@ def main(argv=None):
         e4_from_e1(out_dir)
         print("wrote", out_dir / "e4")
         return
+    if args.exp == "e2b":
+        from traces.philly_pool import load_pool
+        d = load_pool()
+        auto = d["pool_gpus"]
+        cfg["philly"]["pool_gpus"] = {"installed": d["installed_gpus"], "auto": "auto"}.get(args.pool, None) or int(round(float(args.pool) * auto))
     cfg, jobs, pool, events = load_setup(cfg, args.data, args.quick)
     predictors = load_predictors(cfg, args.data)
     if args.predictor not in predictors:
         raise SystemExit(f"no predictions/{args.predictor}.csv for --data {args.data}")
     t0 = time.perf_counter()
-    rows = {"e1": e1, "e2": e2, "e3": e3}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick)
+    if args.exp == "e2b":
+        baseline_waits(cfg, jobs, pool, out_dir, args.pool)
+    if args.exp == "t4":
+        rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)
+    else:
+        rows = {"e1": e1, "e2": e2, "e2b": e2b, "e3": e3}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick)
+    if args.tag:                                          # split runs: one file per piece, merged by the analysis script
+        out = Path(out_dir) / args.exp
+        out.mkdir(parents=True, exist_ok=True)
+        runs = pd.DataFrame(rows, columns=COLUMNS)
+        runs.to_csv(out / f"runs_{args.tag}.csv", index=False)
+        print(f"{args.exp}[{args.tag}]: {len(runs)} rows in {time.perf_counter() - t0:.0f} s -> {out}")
+        return
     runs, summary = write_results(args.exp, rows, out_dir)
     print(f"{args.exp}: {len(runs)} rows in {time.perf_counter() - t0:.0f} s -> {out_dir / args.exp}")
     if args.exp == "e1":
