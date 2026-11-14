@@ -25,11 +25,11 @@ The three single-action baselines are restrictions of the same machinery: \emph{
 \begin{algorithmic}[1]
 \Require running jobs $\mathcal J$, cap levels $\mathcal F$, target $P^\star$, predictions
 \For{$f\in\mathcal F$}
-  \State $p\leftarrow$ power at $t_s$ under level $f$;\; $\hat C_f\leftarrow\sum_{j}\hat c_{\text{cap}}(j,f)$;\; $\mathcal A_f\leftarrow\emptyset$
+  \State $p\leftarrow$ power at $t_s$ under level $f$;~ $\hat C_f\leftarrow\sum_{j}\hat c_{\text{cap}}(j,f)$;~ $\mathcal A_f\leftarrow\emptyset$
   \State $a_j\leftarrow\arg\min\{\hat c_{\text{hold}}(j),\hat c_{\text{burst}}(j)\}$ for every $j$
   \For{$j\in\mathcal J$ in increasing order of $\hat c_{a_j}(j)/\kappa_j(f)$}
     \If{$p\le P^\star$} \textbf{break} \EndIf
-    \State $p\leftarrow p-\kappa_j(f)$;\; $\hat C_f\leftarrow\hat C_f+\hat c_{a_j}(j)-\hat c_{\text{cap}}(j,f)$;\; $\mathcal A_f\leftarrow\mathcal A_f\cup\{(j,a_j)\}$
+    \State $p\leftarrow p-\kappa_j(f)$;~ $\hat C_f\leftarrow\hat C_f+\hat c_{a_j}(j)-\hat c_{\text{cap}}(j,f)$;~ $\mathcal A_f\leftarrow\mathcal A_f\cup\{(j,a_j)\}$
   \EndFor
   \State record plan $(f,\mathcal A_f,\hat C_f,\;p\le P^\star)$
 \EndFor
