@@ -1,6 +1,6 @@
 # Abstract claims check (W5a, revised in W5b and W5c, 2026-11-14)
 
-Abstract: `paper/abstract.txt` (194 words, limit about 200). Values computed from the result CSVs on 2026-11-14.
+Abstract: `paper/abstract.txt` (192 words, limit about 200). Values computed from the result CSVs on 2026-11-14.
 Default cell = 2 h / 20% (10 events); hold rule = `hold_beyond_grid` (default since S16a). w_fail = 0 is the primary cost.
 
 ## Remaining caveats
