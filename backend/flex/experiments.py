@@ -238,20 +238,40 @@ def t4(cfg, jobs, pool, events, predictors, predictor, quick, only=None):
     return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "t4")
 
 
-def e3(cfg, jobs, pool, events, predictors, predictor, quick):
-    """Burst-only and mix by selector: none-largest, random, and every predictor file that exists."""
-    world = world_from_config(cfg, predictors[predictor])
-    chosen = cell(events, *DEFAULT_EVENT) + cell(events, *HARD_EVENT)
+E3_PARTS = {"default": (DEFAULT_EVENT, 1000, False), "hard": (HARD_EVENT, 3000, False), "oos": (DEFAULT_EVENT, 1000, True)}
+LEARNED = ["gbdt", "lightgbm", "transformer"]         # last2 has p90 = p50, so its p90 variant would be identical
+
+
+def e3(cfg, jobs, pool, events, predictors, predictor, quick, part="default", min_submit=None):
+    """S14. Burst-only and mix by selector (none-largest, random, every predictor file), mix also with the p90 cloud bill
+    for the learned predictors, plus delay (last2, oracle) as reference rows. Parts: default = 2 h / 20% with cloud cap 1000;
+    hard = 4 h / 30% with cap 3000; oos = the default cell with burst candidates limited to jobs submitted at or after
+    the test start (min_submit, simulated seconds), out-of-sample for the learned predictors."""
+    (dur, cut), cap, oos = E3_PARTS[part]
+    base_world = world_from_config(cfg, predictors[predictor])
+    price, boot = cfg["cloud"]["price_per_gpu_h"], cfg["cloud"]["boot_delay_s"]
+    world = cloud_variant(base_world, price, boot, cap)
+    if oos:
+        world = dataclasses.replace(world, burst_min_submit=min_submit)
+    st = f"cap={cap}" + (";burst>=test_start" if oos else "")
 
     def per_event(snap, ev, base):
         rows = []
         for name in ("burst", "mix"):
             for sel in BLIND_SELECTORS:
-                rows.append(timed_row(cfg, "e3", snap, ev, name, world, base, "", sel))
+                rows.append(timed_row(cfg, "e3", snap, ev, name, world, base, "", sel, st, pool))
             for pname, pred in predictors.items():
-                rows.append(timed_row(cfg, "e3", snap, ev, name, dataclasses.replace(world, predictor=pred), base, pname))
+                rows.append(timed_row(cfg, "e3", snap, ev, name, dataclasses.replace(world, predictor=pred), base, pname, setting=st, pool=pool))
+        for pname in LEARNED:
+            if pname in predictors:
+                w = dataclasses.replace(world, predictor=predictors[pname], cost_quantile="p90")
+                rows.append(timed_row(cfg, "e3", snap, ev, "mix", w, base, pname, setting=st + ";cq=p90", pool=pool))
+        if not oos:
+            for pname in ("last2", "oracle"):
+                if pname in predictors:
+                    rows.append(timed_row(cfg, "e3", snap, ev, "delay", dataclasses.replace(world, predictor=predictors[pname]), base, pname, setting=st, pool=pool))
         return rows
-    return run_events(cfg, jobs, pool, world, chosen, per_event, "e3")
+    return run_events(cfg, jobs, pool, world, cell(events, dur, cut), per_event, f"e3-{part}")
 
 
 # ---- output ----
@@ -334,6 +354,7 @@ def main(argv=None):
     ap.add_argument("--out", default=None, help="results directory (default: <repo>/results)")
     ap.add_argument("--pool", default=None, help="e2b: installed | auto | 0.95 | 0.9 (x auto); sets philly.pool_gpus")
     ap.add_argument("--only", default=None, help="t4: perturbation names separated by |")
+    ap.add_argument("--part", default="default", choices=list(E3_PARTS), help="e3: default | hard | oos")
     ap.add_argument("--tag", default="", help="suffix of the runs file for split runs (runs_<tag>.csv)")
     args = ap.parse_args(argv)
     cfg = load_config()
@@ -359,10 +380,16 @@ def main(argv=None):
     t0 = time.perf_counter()
     if args.exp == "e2b":
         baseline_waits(cfg, jobs, pool, out_dir, args.pool)
-    if args.exp == "t4":
+    if args.exp == "e3":
+        from traces.philly import ml_config, utc_epoch
+        mc = ml_config()
+        min_sub = utc_epoch(mc.TEST_START) - utc_epoch(mc.SIM_START) if args.data == "philly" else None
+        args.tag = args.tag or args.part
+        rows = e3(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.part, min_sub)
+    elif args.exp == "t4":
         rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)
     else:
-        rows = {"e1": e1, "e2": e2, "e2b": e2b, "e3": e3}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick)
+        rows = {"e1": e1, "e2": e2, "e2b": e2b}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick)
     if args.tag:                                          # split runs: one file per piece, merged by the analysis script
         out = Path(out_dir) / args.exp
         out.mkdir(parents=True, exist_ok=True)

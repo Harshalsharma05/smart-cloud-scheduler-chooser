@@ -423,6 +423,9 @@ Each phase ends with the done-check, a short report, a commit, and a stop. Start
   - Metrics: $/MWh, cloud $, cloud $ wasted (Failed/Killed; short remaining).
   - Figure F8. Table T3 takes Track 1's accuracy numbers (pinball/MAE, AUC) from `ml/reports/`, not recomputed here.
   - It can run first with {none, random, last2, oracle} and be re-run when T5 lands.
+  - **Declared 2026-11-14, before the E3 transformer runs:** option `cost_quantile` = p50 (default) | p90. With p90 the cloud bill in `burst_cost` uses `rt_p90` instead of `rt_p50` (hold cost and the rest unchanged). The mix is run with both variants for gbdt, lightgbm and transformer (last2 has p90 = p50, so it is unchanged). Both variants are reported; neither is hidden.
+  - Robustness run (2026-11-14): the default cell repeated with burst candidates restricted to jobs submitted on or after TEST_START (out-of-sample for the learned predictors). Carry-over and warm-up jobs may then only be suspended.
+  - w_fail = 0 is primary; w_fail = 1 is read from the same runs. Hard cell (4 h / 30%): feasible events only, cloud cap 3000, labelled as such.
 - **Done-check:** the CSVs exist for every predictor file present. Missing files are listed, not faked.
 
 ### S15 E5 carbon (1.5 h, needs T2 export; trim)

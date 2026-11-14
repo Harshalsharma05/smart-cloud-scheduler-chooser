@@ -1,0 +1,11 @@
+\begin{tabular}{lrrrrrr}
+\toprule
+Predictor & MAE$_{p50}$ (min) & Pinball & AUROC$_{fail}$ & mix k\$/MWh & burst k\$/MWh & mix cost (\$/event) \\
+\midrule
+last2 & 52.6 & 1.034 & 0.772 & 203.1 & 616 & 84{,}963 \\
+gbdt & 43.5 & 0.419 & 0.797 & 528.7 & 644 & 224{,}299 \\
+lightgbm & 45.0 & 0.426 & 0.800 & 607.5 & 676 & 256{,}947 \\
+transformer & 65.2 & 0.442 & 0.805 & 238.9 & 668 & 101{,}658 \\
+oracle & 0.0 & 0.000 & 1.000 & 0.5 & 187 & 213 \\
+\bottomrule
+\end{tabular}

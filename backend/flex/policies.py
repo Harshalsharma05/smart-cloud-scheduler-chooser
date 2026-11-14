@@ -32,6 +32,8 @@ class World:
     predictor: object            # flex.predictions.Predictions
     h_after_s: int
     restore_s: int
+    cost_quantile: str = "p50"           # S14: runtime quantile in the burst cloud bill ("p50" default, "p90" variant)
+    burst_min_submit: int | None = None  # S14 robustness: only jobs submitted at or after this simulated time may be burst
 
 
 def world_from_config(cfg, predictor, curve_variant=None):
@@ -50,12 +52,12 @@ def progress(eng, job):
     return job.elapsed0 + job.work_done
 
 
-def _info(eng, world, selector, job, event):
-    """(elapsed, predicted remaining runtime in s, P(useful output)). Blind selectors assume the job outlasts the event."""
+def _info(eng, world, selector, job, event, quantile="p50"):
+    """(elapsed, predicted remaining runtime in s (p50, or p90 if asked), P(useful output)). Blind selectors assume the job outlasts the event."""
     elapsed = progress(eng, job)
     if selector == "predictor":
-        _, p50, _, p_fail, p_cancel = world.predictor.lookup(job, elapsed)
-        return elapsed, p50, max(0.0, 1.0 - p_fail - p_cancel)
+        _, p50, p90, p_fail, p_cancel = world.predictor.lookup(job, elapsed)
+        return elapsed, (p90 if quantile == "p90" else p50), max(0.0, 1.0 - p_fail - p_cancel)
     return elapsed, max(1, event.t_end - eng.now), 1.0
 
 
@@ -72,11 +74,16 @@ def hold_cost(eng, world, selector, job, event, d_s):
 
 def burst_cost(eng, world, selector, job, event, running=True):
     """Estimated cost of moving `job` to the cloud (D11): cloud bill plus the boot wait (migrate_s only if it is running)."""
-    _, rt, useful = _info(eng, world, selector, job, event)
+    _, rt, useful = _info(eng, world, selector, job, event, world.cost_quantile)
     cp = world.cloud
     migrate = cp.migrate_s if running else 0
     return (cp.price_per_gpu_h * job.gpus * (rt + migrate) / 3600.0
             + world.cost.c_delay * job.gpus * cp.boot_delay_s / 3600.0 * useful)
+
+
+def can_burst(world, job):
+    """False only in the S14 robustness run, for jobs submitted before world.burst_min_submit."""
+    return world.burst_min_submit is None or tie_key(job)[0] >= world.burst_min_submit
 
 
 def event_rng(seed, event):
@@ -146,12 +153,12 @@ def burst_only(eng, event, p_star, params, *, world, selector="predictor", rng=N
     if event.cut == 0:
         return
     kw = lambda j: start_delta_kw(params, j, eng.cap_f)
-    jobs = [j for j in _running_jobs(eng) if kw(j) > 0]
+    jobs = [j for j in _running_jobs(eng) if kw(j) > 0 and can_burst(world, j)]
     for job in _order(jobs, selector, rng, lambda j: burst_cost(eng, world, selector, j, event) / kw(j)):
         if power_kw(eng, params) <= p_star:
             break
         eng.burst(job)                      # False when the cloud GPU cap blocks it: try the next job
-    eng.on_hold = eng.burst
+    eng.on_hold = eng.burst if world.burst_min_submit is None else (lambda job: can_burst(world, job) and eng.burst(job))
 
 
 def mix(eng, event, p_star, params, *, world, selector="predictor", rng=None):
@@ -172,8 +179,8 @@ def mix(eng, event, p_star, params, *, world, selector="predictor", rng=None):
                     for j in jobs}
         total, p = sum(cap_cost[j.job_id] for j in jobs), _power_under_cap(eng, params, f)
         kw = {j.job_id: start_delta_kw(params, j, f) for j in jobs}
-        option = {j.job_id: ("burst" if b_cost[j.job_id] < s_cost[j.job_id] else "suspend") for j in jobs}
-        cost = {i: min(b_cost[i], s_cost[i]) for i in option}
+        option = {j.job_id: ("burst" if can_burst(world, j) and b_cost[j.job_id] < s_cost[j.job_id] else "suspend") for j in jobs}
+        cost = {i: (b_cost[i] if option[i] == "burst" else s_cost[i]) for i in option}
         cands = [j for j in jobs if kw[j.job_id] > 0]
         actions = []
         for job in _order(cands, selector, rng, lambda j: cost[j.job_id] / kw[j.job_id]):
@@ -193,7 +200,7 @@ def mix(eng, event, p_star, params, *, world, selector="predictor", rng=None):
 
     def on_hold(job):
         d_rem = event.t_end - eng.now
-        if d_rem > 0 and (burst_cost(eng, world, selector, job, event, running=False)
+        if d_rem > 0 and can_burst(world, job) and (burst_cost(eng, world, selector, job, event, running=False)
                           < hold_cost(eng, world, selector, job, event, d_rem)):
             eng.burst(job)
     eng.on_hold = on_hold
