@@ -91,7 +91,7 @@ Legend: **[T1]** Track 1 session, reviewed in the Track 1 chat. **[T2]** Track 2
 - [x] **17f. [T2] S9c Pool = GPUs reporting in cluster_gpu_util** (auto pool 2,300; installed 2,892 only logged).
 - [x] **18. [You + Track 2 chat] S11 Parameter sourcing** (1-2 h): the review chat finds and verifies sources; a short
       Claude Code session only edits `configs/flex.yaml` and the parameter table script.
-- [ ] **19. [T2] S12 E1 + E4 on Philly with oracle and last2** (3 h). These are the numbers the abstract may use.
+- [x] **19. [T2] S12 E1 + E4 on Philly with oracle and last2** (3 h). These are the numbers the abstract may use.
 - [ ] **20. [You] W5 Abstract v1 → submit by 24 Nov AoE** (1 h, with the Track 2 chat). Only numbers that exist.
       If step 19 isn't done, submit the qualitative abstract (PAPER_PLAN section 4).
 
@@ -219,3 +219,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-13 | 5b (T1 fixup) | ab64a41 | philly_machines num_gpus derived from util width: 150x2, 156x4, 246x8, G = 2,892; 0 attempt violations (415 verified, 137 util-only); jobs/attempts unchanged (117,325 / 152,714, sum num_gpus 195,296) |
 | 2026-11-14 | 17e (S9b) | 9da03a5 | G = 2,892 from machines table (no hard-coded pool); baseline sim util 0.563 vs real 0.573, wait 0 vs 174.7 min (pool no longer binds); capacity 0.8x -> wait 65 min, 0.7x -> 348 min; default event rerun; util file shows only ~2,297 GPUs reporting per minute in the test window (busy/available 0.72, busy > available in 1,979 min) |
 | 2026-11-14 | 17f (S9c) | 663eeff | philly.pool_gpus: auto = 2,300 (median non-NA GPUs/min, test window; 132 four-GPU machines have no util rows and no attempts); baseline sim util 0.722 vs real 0.720 (of pool), wait mean 80 vs 175 min, p90 326 vs 45; default event delay now $629/MWh (w_fail 0), 20 tests pass |
+| 2026-11-14 | 19 (S12) | pending | E1 Philly (pool 2,300, last2 + oracle delay/mix): 540 policy rows + 90 baselines in 1,352 s; delay is cheapest compliant policy in every cell with last2 (median 2.1-4.7 k$/MWh); mix(last2) costs a median 32x delay; mix+oracle wins 7 of 9 cells at w_fail=0; cap complies in 5 of 90 events, burst fails every 30% event; F1/F6/F9/T2 made |

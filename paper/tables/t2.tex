@@ -1,0 +1,12 @@
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Policy & Shed (MWh) & Compl. & \$/MWh ($w{=}0$) & \$/MWh ($w{=}1$) & Cloud \$ & $\Delta$GPU-h good & Missed & Rebound (MWh) \\
+\midrule
+delay & 0.42 & 1.00 & 3,583 & 12,728 & 0 & 482 & 6 & 0.14 \\
+cap & 0.18 & 0.00 & shed 46\% of target & shed 46\% of target & 0 & 145 & 15 & 0.03 \\
+burst & 0.42 & 1.00 & 616,202 & 616,650 & 260,175 & 33 & 2 & 0.00 \\
+mix & 0.42 & 1.00 & 203,072 & 208,044 & 84,611 & 151 & 3 & 0.00 \\
+delay+oracle & 0.42 & 1.00 & 929 & 13,427 & 0 & 125 & 6 & 0.15 \\
+mix+oracle & 0.42 & 1.00 & 508 & 13,244 & 9 & 69 & 6 & 0.13 \\
+\bottomrule
+\end{tabular}

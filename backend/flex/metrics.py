@@ -65,7 +65,7 @@ def shed_metrics(base_tracker, pol_tracker, event, h_after_s):
 COLUMNS = ["exp", "event_id", "t_start", "duration_h", "cut", "policy", "selector", "predictor", "setting", "target_kw",
            "base_mean_kw", "shed_mwh", "compliance", "shortfall_kw", "rebound_mwh", "cloud_usd", "cloud_gpu_h",
            "cloud_waste_fail_usd", "cloud_waste_short_usd", "dgpuh_good", "dgpuh_all", "missed_deadlines", "cost_usd",
-           "usd_per_mwh", "d_wait_min", "d_slowdown", "n_suspended", "n_burst", "cap_level", "pred_coverage", "runtime_s", "seed"]
+           "usd_per_mwh", "cost_usd_wfail1", "usd_per_mwh_wfail1", "compliance_ok", "d_wait_min", "d_slowdown", "n_suspended", "n_burst", "cap_level", "pred_coverage", "runtime_s", "seed"]
 TAU_S = 10                   # bounded-slowdown threshold (standard definition)
 SHORT_EXTRA_S = 600          # a burst is "short" if the remaining runtime was < boot_delay + 10 min
 
@@ -157,7 +157,9 @@ def event_row(event, shed, base_eng, pol_eng, cost, boot_delay_s, policy, predic
     d_good = good + cost.w_fail * (total - good)          # Failed/Killed delay counts with weight w_fail
     cost_usd = cl["cloud_usd"] + cost.c_delay * d_good + cost.m * cost.c_delay * miss_gpuh
     target_mwh = event.cut * shed.base_mean_kw * (event.t_end - event.t_start) / 3600.0 / 1000.0
-    usd_per_mwh = cost_usd / shed.shed_mwh if shed.shed_mwh >= 0.1 * target_mwh and shed.shed_mwh > 0 else None
+    ok = shed.shed_mwh >= 0.1 * target_mwh and shed.shed_mwh > 0
+    usd_per_mwh = cost_usd / shed.shed_mwh if ok else None
+    cost_wfail1 = cl["cloud_usd"] + cost.c_delay * total + cost.m * cost.c_delay * miss_gpuh     # same run, w_fail = 1
     d_wait, d_slow = user_impact(base_eng, pol_eng)
     row = dict.fromkeys(COLUMNS)
     row.update(
@@ -166,7 +168,9 @@ def event_row(event, shed, base_eng, pol_eng, cost, boot_delay_s, policy, predic
         compliance=shed.compliance, shortfall_kw=shed.shortfall_kw, rebound_mwh=shed.rebound_mwh,
         cloud_usd=cl["cloud_usd"], cloud_gpu_h=cl["cloud_gpu_h"], cloud_waste_fail_usd=cl["cloud_waste_fail_usd"],
         cloud_waste_short_usd=cl["cloud_waste_short_usd"], dgpuh_good=good, dgpuh_all=total, missed_deadlines=n_miss,
-        cost_usd=cost_usd, usd_per_mwh=usd_per_mwh, d_wait_min=d_wait, d_slowdown=d_slow,
+        cost_usd=cost_usd, usd_per_mwh=usd_per_mwh, cost_usd_wfail1=cost_wfail1,
+        usd_per_mwh_wfail1=cost_wfail1 / shed.shed_mwh if ok else None, compliance_ok=bool(shed.compliance >= 0.99),
+        d_wait_min=d_wait, d_slowdown=d_slow,
         n_suspended=sum(j.n_suspends > 0 for j in pol_eng.jobs.values()), n_burst=cl["n_burst"],
         cap_level=pol_eng.info.get("cap_level"))
     return row

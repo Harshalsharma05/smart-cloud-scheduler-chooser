@@ -28,7 +28,7 @@ DEFAULT_EVENT = (2, 0.2)            # D13: 2 h, 20%
 HARD_EVENT = (4, 0.3)               # E3: 4 h, 30%
 ALL_PREDICTORS = ["last2", "gbdt", "lightgbm", "transformer", "oracle"]
 BLIND_SELECTORS = ["none-largest", "random"]
-SUMMARY_METRICS = ["usd_per_mwh", "cost_usd", "shed_mwh", "compliance", "shortfall_kw", "rebound_mwh", "cloud_usd",
+SUMMARY_METRICS = ["usd_per_mwh", "cost_usd", "usd_per_mwh_wfail1", "cost_usd_wfail1", "shed_mwh", "compliance", "shortfall_kw", "rebound_mwh", "cloud_usd",
                    "cloud_waste_fail_usd", "cloud_waste_short_usd", "dgpuh_good", "missed_deadlines", "d_wait_min",
                    "d_slowdown", "n_burst", "n_suspended"]
 KEYS = ["duration_h", "cut", "policy", "selector", "predictor", "setting"]
@@ -42,8 +42,14 @@ def predictions_dir(cfg, data):
 
 def load_setup(cfg, data, quick):
     """Jobs, pool size, epoch, the baseline-engine factory and all events for one data source."""
-    if data != "synthetic":
-        raise SystemExit("--data philly needs the Philly loader (phase S8); only --data synthetic works for now")
+    if data == "philly":                                           # S8/S9c: real trace, pool from philly.pool_gpus
+        from traces.philly import load_philly
+        cfg = copy.deepcopy(cfg)
+        if quick:
+            cfg["grid"]["events_per_cell"] = 3
+        L = load_philly(cfg)
+        print(f"Philly: {len(L['jobs'])} jobs, pool G = {L['G']} (installed {L['G_installed']}), {len(L['events'])} events")
+        return cfg, L["jobs"], L["G"], L["events"]
     from traces.synthetic import synthetic_jobs, write_predictions
     cfg = copy.deepcopy(cfg)
     if quick:
@@ -112,7 +118,7 @@ def e1(cfg, jobs, pool, events, predictors, predictor, quick):
         rows = [timed_row(cfg, "e1", snap, ev, n, world, base, predictor) for n in ("delay", "cap", "burst", "mix")]
         if "oracle" in predictors and predictor != "oracle":
             w = dataclasses.replace(world, predictor=predictors["oracle"])
-            rows.append(timed_row(cfg, "e1", snap, ev, "mix", w, base, "oracle", setting="upper-bound"))
+            rows += [timed_row(cfg, "e1", snap, ev, n, w, base, "oracle", setting="upper-bound") for n in ("mix", "delay")]
         return rows
     return run_events(cfg, jobs, pool, world, events, per_event, "e1")
 
