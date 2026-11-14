@@ -1,4 +1,34 @@
 % Page budget: 1.0 page. Demand response and $/MWh; Philly facts (failed jobs die early, many killed, daily power shape); F2.
+% S10: every number comes from numbers.tex (macros \Mot..., written by paper/figures/motivation.py from results/motivation/stats.csv).
 \section{Background and Motivation}
 \label{sec:background}
-Placeholder paragraph for background and motivation.
+
+\subsection{Demand response and dollars per MWh}
+Electric grids must balance supply and demand at every moment, and operators ask large consumers to reduce their load for a few hours when demand is high, for example in the evening [CITE?]. This practice is called demand response. A data center can take part because part of its load is flexible in time: batch work can wait, and equipment can run slower. Earlier work studies how data centers can avoid a coincident peak by shifting workload and using local generation~\cite{liu13}, and compares the response potential of GPU and CPU data centers~\cite{zhou24}. Carbon-aware computing uses the same flexibility to follow a cleaner grid~\cite{radovanovic23,wiesner21}.
+
+A request has a start, a length and a size: reduce power by a fraction for a given number of hours (Section~\ref{sec:problem}). A cluster should compare not only whether it can comply, but at what price. We therefore express every action as the dollars spent for each megawatt-hour of load actually removed. Delaying a job costs the value of the delayed GPU-hours, capping power slows work, and renting cloud GPUs costs the cloud bill. Dollars per MWh puts the three on one scale and, unlike a count of delayed jobs, it exposes an action that sheds little energy for much money [CITE? compensation for demand response is quoted per MWh].
+
+\subsection{What the Philly trace shows}
+We use the Microsoft Philly trace~\cite{jeon19}, which records deep-learning jobs on a shared multi-tenant GPU cluster. The test window contains \MotTestJobs{} jobs and \MotTestGpuHours{} GPU-hours of work, which our simulator runs on a pool of \MotTestPoolGpus{} GPUs. Figure~\ref{fig:motivation} shows four facts that shape the problem.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/out/f2_motivation.pdf}
+\caption{The Philly test window. (a)~Share of jobs and of GPU-hours by final status. (b)~Cumulative distribution of wall time by status (logarithmic axis; the grey line marks one hour). (c)~Baseline facility power over one week; the shaded bands are 17:00--20:00 Pacific time. (d)~Histogram of per-job mean GPU utilisation; the dashed line is the minute-weighted mean (\MotUtilMeanMinuteweightedPct\%).}
+\label{fig:motivation}
+\end{figure*}
+
+\emph{Failed and killed jobs are a large share of the work.} \MotJobsharePassPct\% of jobs end as Pass and use \MotGpuhsharePassPct\% of the GPU-hours, whereas Failed jobs are \MotJobshareFailedPct\% of jobs and \MotGpuhshareFailedPct\% of GPU-hours, and Killed jobs are \MotJobshareKilledPct\% of jobs and \MotGpuhshareKilledPct\% of GPU-hours (Figure~\ref{fig:motivation}a). Together, Failed and Killed jobs consume \MotGpuhshareFailkillPct\% of the GPU-hours. The original analysis of the trace also reports failures during training~\cite{jeon19}.
+
+\emph{Runtimes spread over orders of magnitude and differ by status.} The median wall time is \MotWallMedianPassMin{} min for Pass, \MotWallMedianFailedMin{} min for Failed and \MotWallMedianKilledMin{} min for Killed jobs, while the 90th percentile is \MotWallPNineZeroPassMin{}, \MotWallPNineZeroFailedMin{} and \MotWallPNineZeroKilledMin{} minutes, respectively (Figure~\ref{fig:motivation}b). \MotWithinOnehFailkillPct\% of Failed and Killed jobs end within one hour of their first start, yet the rest run longer.
+
+\emph{Cluster power is flat, not peaked.} In the baseline simulation, facility power averages \MotPowerMeanKw{} kW with a highest value of \MotPowerPeakKw{} kW. The mean over the 17:00--20:00 Pacific-time windows is \MotPowerEveningMeanKw{} kW, a ratio of \MotPowerEveningOverOverall{} to the overall mean (Figure~\ref{fig:motivation}c). The evening is therefore a peak of the grid, not of the cluster: the cluster is asked to reduce an ordinary load. In our power model, the pool draws at least \MotPowerIdleFloorKw{} kW even when every GPU is idle, so no action can cut deeper than this floor.
+
+\emph{GPUs are lightly used on average.} The mean per-job GPU utilisation is \MotUtilMeanJobweightedPct\% over jobs and \MotUtilMeanMinuteweightedPct\% when weighted by measured minutes, with a median of \MotUtilMedianPct\% (Figure~\ref{fig:motivation}d). Power is therefore not proportional to the number of busy GPUs, which is why the power model of Section~\ref{sec:problem} uses each job's utilisation.
+
+\subsection{Why runtime and failure predictions matter}
+When the grid calls, the cluster must decide which running jobs to touch. Suspending a job delays useful work only if the job would have produced useful output; delaying a job that will fail anyway costs little. Bursting a job pays the cloud for its whole remaining runtime, so it is attractive only for a job that will end soon and succeed. Both decisions need an estimate of the remaining runtime and of the chance of failure at the moment of the event.
+
+Runtime prediction for scheduling has a long history. User-supplied estimates are poor, and predictions generated by the system from a user's recent jobs improve backfilling~\cite{tsafrir07}. For GPU clusters, learned predictors use features of the job and of the user's history~\cite{hu21,hu23}. Work on hybrid clouds decides when to send jobs to rented capacity to trade cost against completion time~\cite{assuncao09,luo24}; it does not treat offloading as a priced grid action.
+
+The jobs running at an event are not typical jobs. At the \MotEventStarts{} event starts of our experiments, a mean of \MotRunningJobsAtStartsMean{} jobs are running, and \MotRunningBeyondGridJobsPct\% of them (\MotRunningBeyondGridGpusPct\% of the running GPUs) have already run for more than 12 hours, which is beyond the last elapsed time at which our predictors give a value. Predictions for long-running jobs therefore need care, which we return to in Section~\ref{sec:design}.
