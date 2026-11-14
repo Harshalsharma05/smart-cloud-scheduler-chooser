@@ -1,4 +1,59 @@
 % Page budget: 1.0 page. Event (t_s, D, cut); target P*; power model (D5); actions and costs (D7, D8, D9); $/MWh; assumptions box (D4, D8, D12).
+% W2: written from SIM_PLAN D1-D16 and backend/flex/. No result numbers; parameter values are in Table~\ref{tab:params}.
+\providecommand{\RESULT}[1]{\textbf{[#1]}}   % marks a result number that must come from numbers.tex (see the W2 report)
 \section{Problem Formulation}
 \label{sec:problem}
-Placeholder paragraph for the problem formulation.
+We model a GPU cluster that receives a request to reduce its electrical load for a limited time, and ask what the cheapest way to comply is.
+The cluster is a pool of $G$ GPUs. A job $j$ needs $g_j$ GPUs, has a mean GPU utilisation $u_j$, a wall-clock runtime $w_j$ and ends with a status in $\{\textit{Pass}, \textit{Failed}, \textit{Killed}\}$.
+
+\subsection{Grid event and target}
+A grid event $\varepsilon=(t_s, D, \kappa)$ asks the cluster to cut its power by a fraction $\kappa$ during $[t_s, t_s{+}D)$, in line with the demand-response setting~\cite{liu13,zhou24}.
+Let $P_0(t)$ be the facility power if the cluster takes no action (the baseline). The target is one flat level,
+\begin{equation}
+P^\star=(1-\kappa)\,\bar P_0,\qquad \bar P_0=\tfrac{1}{D}\int_{t_s}^{t_s+D}P_0(t)\,dt .
+\end{equation}
+A policy is judged against the baseline from the same starting state (a paired run). Its shed energy is
+\begin{equation}
+E_{\text{shed}}=\int_{t_s}^{t_s+D}\bigl(P_0(t)-P(t)\bigr)\,dt ,
+\end{equation}
+and its compliance is the fraction of the event during which $P(t)$ stays within a small tolerance of $P^\star$.
+
+\subsection{Facility power}
+A busy GPU running job $j$ under a power cap level $f\in(0,1]$ (a fraction of the maximum GPU power $P_{\max}$) draws
+\begin{equation}
+P_{\text{gpu}}(u_j,f)=\min\bigl(P_{\text{idle}}+u_j(P_{\max}-P_{\text{idle}}),\; f\,P_{\max}\bigr),
+\end{equation}
+where $P_{\text{idle}}$ is the idle GPU power. With $N_b$ busy and $N_i=G-N_b$ idle on-premise GPUs, the facility power is
+\begin{equation}
+P(t)=\text{PUE}\Bigl[\sum_{j\in\text{running}} g_j\,P_{\text{gpu}}(u_j,f)+N_i P_{\text{idle}}+G\,H_{\text{idle}}+N_b H_{\text{busy}}\Bigr],
+\end{equation}
+with the power usage effectiveness PUE, a host power $H_{\text{idle}}$ per installed GPU, and an extra host power $H_{\text{busy}}$ per busy GPU. The cap does not change host power. Power is constant between simulator events, so energies are exact.
+Even with every job removed, the cluster draws the idle floor $P_{\text{floor}}=\text{PUE}\cdot G\,(P_{\text{idle}}+H_{\text{idle}})$. An event with $P^\star<P_{\text{floor}}$ cannot be met by any policy; we call it \emph{infeasible} and exclude it from all results.
+
+\subsection{Actions}
+At the event start the cluster may use three actions on running jobs; all other jobs are scheduled first-come first-served with skip-ahead and no runtime estimates.
+\emph{Suspend.} The job's GPUs are freed at once and its progress is kept. Suspended jobs resume when the event ends, in submission order, each paying a restore overhead $\tau_r$ of extra work. Any new job that would push power above $P^\star$ is held in the queue until the event ends (admission gating); held jobs count as delay.
+\emph{Cap.} A cluster-wide level $f$ from a small discrete set applies to all on-premise GPUs. A job whose uncapped power is $P_{\text{gpu}}(u_j,1)$ runs at speed $s_j(f)=1$ if $r_j=fP_{\max}/P_{\text{gpu}}(u_j,1)\ge 1$, and otherwise at $s_j(f)=\sigma(r_j)$, a piecewise-linear curve through points read from published measurements~\cite{you23,patel24}. A slower job finishes later, and power falls only through the job's lower GPU draw.
+\emph{Burst.} The job is checkpointed and its on-premise GPUs are freed at once. A cloud instance with $g_j$ GPUs is requested, boots for $\tau_b$, then finishes the job at full speed after an extra migration overhead $\tau_m$ (checkpoint transfer and warm-up). The job never returns on premise. The cloud bills $\pi$ per GPU-hour from the moment the instance is ready until it is released, with a minimum billed time, and at most $C_{\max}$ cloud GPUs may be in use at once. Boot, checkpoint and restore overheads follow measured ranges~\cite{mao12,mohan21}.
+
+\subsection{Cost of an event}
+Let $T_j$ and $T_j^0$ be the finish time of job $j$ under the policy and in the baseline, and $\delta_j=\max(0,T_j-T_j^0)/3600$ its delay in hours. Delay from suspension, capping, gating and cloud boot is measured the same way. With $c_d$ the cost of a delayed GPU-hour, the cost of a policy is
+\begin{equation}
+C=C_{\text{cloud}}+c_d\!\!\sum_{j\in\text{Pass}}\! g_j\delta_j+w_f c_d\!\!\sum_{j\in\text{Fail/Kill}}\! g_j\delta_j+m\,c_d\!\!\sum_{j\in\mathcal M}\! g_j\,\tfrac{w_j}{3600},
+\end{equation}
+where $C_{\text{cloud}}$ is the cloud bill, $w_f$ is the weight of delay on jobs that fail or are killed, and $\mathcal M$ is the set of jobs with a deadline that they meet in the baseline and miss under the policy, each charged $m$ re-runs. We set $c_d$ equal to the cloud price $\pi$, so that an hour of delay is worth an hour of rented GPU. Delaying work that will fail or be cancelled loses no useful output, so the primary setting is $w_f=0$ (cloud money spent on such jobs is always counted); we also report $w_f=1$. The headline metric is
+\begin{equation}
+\text{USD/MWh}=C/E_{\text{shed}}\quad\text{if }E_{\text{shed}}\ge 0.1\,\kappa\,\bar P_0 D,
+\end{equation}
+and undefined otherwise, so a policy that barely sheds does not look cheap. A policy whose compliance is below $99\%$ is never reported as a winner.
+
+\begin{center}
+\fbox{\begin{minipage}{0.94\columnwidth}\small
+\textbf{Assumptions.}
+(i) \emph{Job timing.} A job holds its GPUs continuously for its wall-clock time from first start to final end; retry gaps and attempts are merged, because the predictors are defined on this clock.
+(ii) \emph{Checkpoints.} Suspension is instantaneous; migration and restore cost a constant number of extra seconds.
+(iii) \emph{Deadlines.} A seeded random $30\%$ of jobs get a deadline equal to submission plus a slack factor drawn from $U(2,4)$ times the job's wall time, independent of its status.
+(iv) \emph{Pool.} The pool $G$ is constant (no failures or maintenance), with one GPU type and trace-derived utilisation.
+(v) \emph{Controller.} Actions are planned once at the event start, with no re-planning.
+\end{minipage}}
+\end{center}

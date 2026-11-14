@@ -1,4 +1,54 @@
 % Page budget: 1.4 pages. Greedy $/kW controller over cap levels and job actions (D11); burst selection rule; predictor interface; transformer (F4).
+% W2: written from SIM_PLAN D10-D11, backend/flex/policies.py, flex/predictions.py and ml/model.py. No result numbers except the marked \RESULT.
 \section{Design}
 \label{sec:design}
-Placeholder paragraph for the design.
+This section describes the controller that chooses the actions of Section~\ref{sec:problem}, the predictions it reads, and the model that produces them. Symbols are those of Section~\ref{sec:problem}.
+
+\subsection{Controller}
+The controller plans once at the event start $t_s$ and then relies on admission gating: power can only fall as jobs end, so holding back new starts that would exceed $P^\star$ keeps the cluster under the target for the rest of the event.
+For every running job $j$ it reads from a predictor the remaining runtime $\hat r_j$ and the probability $q_j=1-p^{\text{fail}}_j-p^{\text{cancel}}_j$ that the job ends with useful output. It then estimates three costs, all in dollars:
+\begin{align}
+\hat c_{\text{hold}}(j)&=c_d\,g_j\tfrac{D}{3600}\,q_j+\hat c_{\text{ddl}}(j),\\
+\hat c_{\text{burst}}(j)&=\pi\,g_j\tfrac{\hat r_j+\tau_m}{3600}+c_d\,g_j\tfrac{\tau_b}{3600}\,q_j,\\
+\hat c_{\text{cap}}(j,f)&=c_d\,g_j\tfrac{D}{3600}\bigl(1-s_j(f)\bigr)\,q_j .
+\end{align}
+Holding (suspending) a job delays its useful work for the event length; $\hat c_{\text{ddl}}(j)$ adds the cost of a missed deadline if the job would meet its deadline when left alone but miss it when held. Bursting pays the cloud bill for the whole remaining runtime plus the boot wait. Capping slows the job by $1-s_j(f)$. Each estimate uses only predictions, never the job's true runtime or status.
+The power a job action saves is $\kappa_j(f)=\text{PUE}\,g_j\bigl(P_{\text{gpu}}(u_j,f)-P_{\text{idle}}+H_{\text{busy}}\bigr)$ when the cluster runs at cap level $f$.
+
+Algorithm~\ref{alg:mix} is a greedy plan over cap levels. For each level it lets every job take its cheaper action and applies jobs in order of cost per kilowatt saved, until the target is reached; the cap's own slowdown cost is replaced by the action cost for each job that is suspended or burst. It then picks the cheapest plan among those that reach $P^\star$ (the cheapest overall if none does), preferring the milder cap on ties.
+A burst refused because of the cloud limit $C_{\max}$ becomes a suspension. While the event lasts, a job that arrives and is held by the gate is burst if its cloud estimate (without migration) is below its hold estimate for the rest of the event.
+The three single-action baselines are restrictions of the same machinery: \emph{delay-only} suspends by lowest $\hat c_{\text{hold}}/\kappa_j$, \emph{cap-only} uses the mildest level that reaches $P^\star$ (or the deepest, reporting a shortfall), and \emph{burst-only} bursts by lowest $\hat c_{\text{burst}}/\kappa_j$ and bursts every arrival the gate would hold.
+
+\begin{algorithm}[t]
+\caption{Mix controller at event start $t_s$}
+\label{alg:mix}
+\begin{algorithmic}[1]
+\Require running jobs $\mathcal J$, cap levels $\mathcal F$, target $P^\star$, predictions
+\For{$f\in\mathcal F$}
+  \State $p\leftarrow$ power at $t_s$ under level $f$;\; $\hat C_f\leftarrow\sum_{j}\hat c_{\text{cap}}(j,f)$;\; $\mathcal A_f\leftarrow\emptyset$
+  \State $a_j\leftarrow\arg\min\{\hat c_{\text{hold}}(j),\hat c_{\text{burst}}(j)\}$ for every $j$
+  \For{$j\in\mathcal J$ in increasing order of $\hat c_{a_j}(j)/\kappa_j(f)$}
+    \If{$p\le P^\star$} \textbf{break} \EndIf
+    \State $p\leftarrow p-\kappa_j(f)$;\; $\hat C_f\leftarrow\hat C_f+\hat c_{a_j}(j)-\hat c_{\text{cap}}(j,f)$;\; $\mathcal A_f\leftarrow\mathcal A_f\cup\{(j,a_j)\}$
+  \EndFor
+  \State record plan $(f,\mathcal A_f,\hat C_f,\;p\le P^\star)$
+\EndFor
+\State choose the plan with $p\le P^\star$ and lowest $\hat C_f$ (lowest $\hat C_f$ overall if none; milder $f$ on ties)
+\State set the cap to $f$; suspend or burst each job in $\mathcal A_f$ (a refused burst becomes a suspend)
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Which jobs to burst.}
+Setting $q_j=1$ and $c_d=\pi$, bursting is cheaper than holding when $\hat r_j<D-\tau_m-\tau_b$: the job's remaining runtime must be shorter than the event less the overheads. The reason is that the cloud bill covers the whole remaining runtime, while the grid benefits only during the event; a longer job is rented for hours the grid does not value. A job likely to fail adds a second effect: with $w_f=0$ its delay is almost free ($q_j\to 0$), but its cloud bill is real, so the controller holds it. Bursting is therefore cheap only for jobs that are about to finish and are likely to succeed, which is why the controller needs both a remaining-runtime and a failure estimate.
+
+\subsection{Predictor interface}
+Whatever model produces it, a prediction is a file with one row per job and elapsed time $e\in\{0,60,600,3600,14400,43200\}$\,s while the job runs, holding the remaining-runtime quantiles $\hat r^{10},\hat r^{50},\hat r^{90}$ (seconds, floored at one minute) and the probabilities $p^{\text{fail}}$ and $p^{\text{cancel}}$.
+We compare the last-two-jobs average~\cite{tsafrir07}, gradient-boosted trees~\cite{hu21}, the transformer below, and an oracle that reads the true runtime and status (an upper bound).
+The simulator looks up a running job at its elapsed time, which is its progress in nominal seconds (work done, including time run before the simulation started), so the lookup stays correct under caps and suspensions. A job with no prediction row uses its true values; this affects only jobs still running at the end of the trace.
+
+Two lookup rules turn the grid into a value at any elapsed time $e$. The \emph{contract rule} takes the latest row with $e_k\le e$, subtracts the gap $e-e_k$ from each remaining-runtime quantile and floors the result at one minute; this is exact for the oracle. The \emph{hold-beyond-grid rule} is identical up to the last grid point, but beyond it returns the last row unchanged. We added it because a job that has run longer than the last grid point (12\,h) has its predicted remaining runtime reduced by every further second and ends at the floor, so a learned predictor reports such a job as about to finish; \RESULT{87}\,\% of the running jobs at an event have run longer than the grid. We use the hold-beyond-grid rule by default, never for the oracle, and report the contract rule as a robustness result.
+The controller reads $\hat r_j$ at the median ($\hat r^{50}$, default) or at the 90th percentile ($\hat r^{90}$) in the cloud bill $\hat c_{\text{burst}}$, a more cautious budget; the hold estimate always uses the median. We report both variants.
+
+\subsection{Transformer predictor}
+Each example is one running job at its observation time. Its input is a sequence of up to 32 tokens for the same user's earlier finished jobs, plus one token for the current job; a user with no history gives only the current token. A history token holds the job's runtime, GPU count, attempts, queue wait, time since it ended and whether it ran in the same virtual cluster, plus embeddings of its status and virtual cluster; the current token holds its GPU count, hour and weekday, queue wait, elapsed time, attempts so far and virtual cluster. A type embedding separates the two kinds of token. There is no user-ID embedding, so users unseen in training are handled the same way.
+A two-layer Transformer encoder (model width 64, four attention heads) reads the sequence, and the output at the current-job token feeds two heads. The runtime head gives the median $\hat r^{50}$ directly and the $10$th and $90$th percentiles as non-negative offsets below and above it, so quantiles cannot cross; it is trained with the pinball loss on the logarithm of the remaining runtime. The status head gives probabilities for Pass, Failed and Killed (so $p^{\text{fail}}$ and $p^{\text{cancel}}$) and is trained with cross-entropy. Only information available at the observation time is used, and training, validation and test jobs are split by submission time.
