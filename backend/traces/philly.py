@@ -190,6 +190,7 @@ def main():
     t0 = time.perf_counter()
     L = load_philly(cfg)
     print(f"load: {time.perf_counter() - t0:.1f} s")
+    print(f"  G = {L['G']} GPUs (sum of num_gpus in philly_machines.parquet)")
     for k, v in L["report"].items():
         print(f"  {k}: {v}")
     print("  util:", L["util_source"])

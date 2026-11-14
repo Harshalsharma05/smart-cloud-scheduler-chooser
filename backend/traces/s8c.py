@@ -48,7 +48,7 @@ def burst_diagnostic(L, cfg, oracle):
 def capacity_sensitivity(L, cfg):
     ts, te = L["test_start"], L["test_end"]
     out = []
-    for f in (1.0, 0.95, 0.9, 0.85):
+    for f in (1.0, 0.9, 0.8, 0.7):
         eng = Engine(copy.deepcopy(L["jobs"]), int(round(f * L["G"])), check_every=cfg["check_every"])
         eng.run_to_drain()
         segs = [(s, e, j.gpus) for j in eng.jobs.values() for s, e, w, _ in j.segments if w == "onprem"]
@@ -96,6 +96,7 @@ def policy_table(L, cfg, oracle, last2):
 def main():
     cfg = load_config()
     L = load_philly(cfg)
+    print(f"G = {L['G']} GPUs (from philly_machines.parquet)")
     oracle = load_predictions(ROOT / cfg["paths"]["predictions"] / "oracle.csv")
     last2 = load_predictions(ROOT / cfg["paths"]["predictions"] / "last2.csv")
     import sys
