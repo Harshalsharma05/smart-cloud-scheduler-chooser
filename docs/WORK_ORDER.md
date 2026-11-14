@@ -102,7 +102,7 @@ does not depend on them.
 ### Block G: baselines, all predictors, remaining experiments (~10-12 h)
 
 - [x] **21. [T1] T4 Baselines and evaluation** (3-4 h; needs T3b finished).
-- [ ] **22. [T1] T5 Export gbdt / lightgbm / transformer** (1.5-2 h). **→ Track 2 chat:** "all 5 prediction files
+- [x] **22. [T1] T5 Export gbdt / lightgbm / transformer** (1.5-2 h). **→ Track 2 chat:** "all 5 prediction files
       pass the checker; E3 can run".
 - [ ] **23. [T2] S10 Motivation charts** (2 h).
 - [ ] **24. [T2] S14 E3 predictor comparison** (2 h).
@@ -226,3 +226,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-14 | 25 (S13) | c126053 | sweeps on the 10 default-cell events: A price x boot (600 rows), B pool x price x cap (1,000 rows, 4 pools), T4 11 perturbations (550 rows); 26 min wall with 3 processes; no infeasible events in this cell; w_fail 0: mix+oracle wins every cell, w_fail 1: delay wins (mix+oracle within 1-5%) except spot price/installed pool; mix(last2) and burst never beat delay (0 of 10 events, 3 at 0.9 x auto + spot); cap 1000 vs 3000 identical for delay/mix |
 | 2026-11-14 | 25b (S13b) | c3fc2f1 | burst cheaper at migrate x2 is a selection effect, not a bug (shared jobs bill +120 s each; 143 short jobs replace 64 long ones: $236k -> $16k); restore_s does not touch burst; oracle mix bursts Pass jobs with ~1 min left and suspends only Failed/Killed (w_fail 0), mix-delay median -$17 per event, sum -$1,062, cheaper in 7/10 events; no bug found |
 | 2026-11-14 | 21 (T4) | e12119d | test pinball: gbdt 0.419, lightgbm 0.426, transformer 0.442, last2 1.034; AUROC Failed ~0.80 for all learned; status log-loss lightgbm 0.678 vs prior 0.888; oracle perfect; 6 tests pass |
+| 2026-11-14 | 22 (T5) | 487709e | gbdt/lightgbm/transformer.csv over export keys (111,451 rows each); 5 checker OKs; test metrics from CSVs match evaluate (max diff 2.5e-8) |
