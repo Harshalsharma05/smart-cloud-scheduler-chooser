@@ -106,7 +106,8 @@ def main():
     print(f"sanity: events where the mix bursts nothing: {len(z)}; max |mix cost - mix-nocloud cost| there = {(z['mix_cost_usd'] - z['nc_cost_usd']).abs().max():.6f}")
 
     # T5: default cell, plus ratios over all 90 events
-    lines = [r"\begin{tabular}{llrrrrrrr}", r"\toprule",
+    lines = ["% T5 (S13d). Ratios = median over events of the per-event cost ratio (mix/nc: value of bursting; nc/delay: value of capping and selection); the $/MWh columns are cell medians, so the two need not agree.",
+             r"\begin{tabular}{llrrrrrrr}", r"\toprule",
              r" & & \multicolumn{3}{c}{Default cell, \$/MWh} & \multicolumn{2}{c}{Default cell} & \multicolumn{2}{c}{All events} \\",
              r"Predictor & $w_f$ & delay & mix-nocloud & mix & mix/nc & nc/delay & mix/nc & nc/delay \\", r"\midrule"]
     for name in V:
