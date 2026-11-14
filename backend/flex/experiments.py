@@ -155,42 +155,49 @@ def cloud_variant(world, price, boot, cap):
     return dataclasses.replace(world, cloud=dataclasses.replace(world.cloud, price_per_gpu_h=price, boot_delay_s=boot, max_gpus=cap))
 
 
-def policy_rows(cfg, exp, snap, ev, base, world, predictors, pool, price, boot, cap):
-    """burst (last2), mix (last2), mix (oracle) for one cloud setting."""
-    w, o = cloud_variant(world, price, boot, cap), cloud_variant(dataclasses.replace(world, predictor=predictors["oracle"]), price, boot, cap)
+def policy_rows(cfg, exp, snap, ev, base, world, predictors, pool, price, boot, cap, last2_burst=False):
+    """S13c, one cloud setting: mix with last2, transformer, oracle; mix-p90 (transformer); burst with transformer and oracle
+    (and last2 only when last2_burst, i.e. on the default setting)."""
+    w = cloud_variant(world, price, boot, cap)
     st = setting_text(pool, price, boot, cap)
-    return [timed_row(cfg, exp, snap, ev, "burst", w, base, "last2", setting=st, pool=pool),
-            timed_row(cfg, exp, snap, ev, "mix", w, base, "last2", setting=st, pool=pool),
-            timed_row(cfg, exp, snap, ev, "mix", o, base, "oracle", setting=st, pool=pool)]
+    rows = []
+    for pname in ("last2", "transformer", "oracle"):
+        rows.append(timed_row(cfg, exp, snap, ev, "mix", dataclasses.replace(w, predictor=predictors[pname]), base, pname, setting=st, pool=pool))
+    rows.append(timed_row(cfg, exp, snap, ev, "mix", dataclasses.replace(w, predictor=predictors["transformer"], cost_quantile="p90"), base,
+                          "transformer", setting=st + ";cq=p90", pool=pool))
+    for pname in ("transformer", "oracle") + (("last2",) if last2_burst else ()):
+        rows.append(timed_row(cfg, exp, snap, ev, "burst", dataclasses.replace(w, predictor=predictors[pname]), base, pname, setting=st, pool=pool))
+    return rows
 
 
 def delay_rows(cfg, exp, snap, ev, base, world, predictors, pool, settings):
-    """delay (last2) and delay (oracle) do not depend on the cloud: run once, copy to every setting."""
+    """delay with last2, transformer and oracle does not depend on the cloud: run once, copy to every setting."""
     out = []
-    for pname in ("last2", "oracle"):
+    for pname in ("last2", "transformer", "oracle"):
         w = dataclasses.replace(world, predictor=predictors[pname])
         r = timed_row(cfg, exp, snap, ev, "delay", w, base, pname, pool=pool)
         out += [dict(r, setting=st) for st in settings]
     return out
 
 
-def e2(cfg, jobs, pool, events, predictors, predictor, quick):
-    """S13 sweep A, default cell (all 10 events): price x boot delay for delay, burst, mix+last2, mix+oracle (and delay+oracle).
-    c_delay stays at its default (3.06 $/GPU-h) while the cloud price is swept. Pool = auto, cloud cap 1000."""
+def e2(cfg, jobs, pool, events, predictors, predictor, quick, prices=None):
+    """S13c sweep A, default cell (all 10 events): price x boot delay. c_delay stays at its default while the cloud price is swept.
+    Pool = auto, cloud cap 1000. `prices` restricts the sweep to some prices (split runs)."""
     world = world_from_config(cfg, predictors[predictor])
-    prices, boots = ([1.5, 3.06], [60, 300]) if quick else (PRICES, BOOTS)
+    prices, boots = ([1.5, 3.06], [60, 300]) if quick else (prices or PRICES, BOOTS)
     settings = [(p, b) for p in prices for b in boots]
+    base_price, base_boot = cfg["cloud"]["price_per_gpu_h"], cfg["cloud"]["boot_delay_s"]
 
     def per_event(snap, ev, base):
         rows = delay_rows(cfg, "e2", snap, ev, base, world, predictors, pool, [setting_text(pool, p, b, 1000) for p, b in settings])
         for p, b in settings:
-            rows += policy_rows(cfg, "e2", snap, ev, base, world, predictors, pool, p, b, 1000)
+            rows += policy_rows(cfg, "e2", snap, ev, base, world, predictors, pool, p, b, 1000, last2_burst=(p == base_price and b == base_boot))
         return rows
     return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "e2")
 
 
 def e2b(cfg, jobs, pool, events, predictors, predictor, quick):
-    """S13 sweep B for ONE pool (the pool comes from philly.pool_gpus, set by --pool): price x cloud cap at boot 300 s.
+    """S13c sweep B for ONE pool (the pool comes from philly.pool_gpus, set by --pool): price x cloud cap at boot 300 s.
     Cap 1000 at four prices (pool x price map) and cap 3000 at the base price (saturation). w_fail 0 / 1 are both in the rows."""
     world = world_from_config(cfg, predictors[predictor])
     base_price = cfg["cloud"]["price_per_gpu_h"]
@@ -200,7 +207,7 @@ def e2b(cfg, jobs, pool, events, predictors, predictor, quick):
     def per_event(snap, ev, base):
         rows = delay_rows(cfg, "e2b", snap, ev, base, world, predictors, pool, [setting_text(pool, p, b, c) for p, b, c in combos])
         for p, b, c in combos:
-            rows += policy_rows(cfg, "e2b", snap, ev, base, world, predictors, pool, p, b, c)
+            rows += policy_rows(cfg, "e2b", snap, ev, base, world, predictors, pool, p, b, c, last2_burst=(p == base_price and c == 1000))
         return rows
     return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "e2b")
 
@@ -229,7 +236,8 @@ def perturbations(cfg):
 
 
 def t4(cfg, jobs, pool, events, predictors, predictor, quick, only=None):
-    """S13 T4: delay, burst, mix+last2, mix+oracle (and delay+oracle) on the default cell under each perturbation."""
+    """S13c T4: delay (last2, transformer, oracle), burst (transformer, oracle), mix (last2, transformer, oracle) and mix-p90
+    (transformer) on the default cell under each perturbation."""
     perts = {k: v for k, v in perturbations(cfg).items() if only is None or k in only}
 
     def per_event(snap, ev, base0):
@@ -238,12 +246,14 @@ def t4(cfg, jobs, pool, events, predictors, predictor, quick, only=None):
             world = world_from_config(c, predictors[predictor], variant)
             base = run_base(snap, ev, world.params, world.h_after_s)
             st = f"pert={name}"
-            for pname in ("last2", "oracle"):
+            for pname in ("last2", "transformer", "oracle"):
                 w = dataclasses.replace(world, predictor=predictors[pname])
                 rows.append(timed_row(c, "t4", snap, ev, "delay", w, base, pname, setting=st, pool=pool))
-                if pname == "last2":
-                    rows.append(timed_row(c, "t4", snap, ev, "burst", w, base, pname, setting=st, pool=pool))
                 rows.append(timed_row(c, "t4", snap, ev, "mix", w, base, pname, setting=st, pool=pool))
+                if pname != "last2":
+                    rows.append(timed_row(c, "t4", snap, ev, "burst", w, base, pname, setting=st, pool=pool))
+                if pname == "transformer":
+                    rows.append(timed_row(c, "t4", snap, ev, "mix", dataclasses.replace(w, cost_quantile="p90"), base, pname, setting=st + ";cq=p90", pool=pool))
         return rows
     world = world_from_config(cfg, predictors[predictor])
     return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "t4")
@@ -365,6 +375,7 @@ def main(argv=None):
     ap.add_argument("--out", default=None, help="results directory (default: <repo>/results)")
     ap.add_argument("--pool", default=None, help="e2b: installed | auto | 0.95 | 0.9 (x auto); sets philly.pool_gpus")
     ap.add_argument("--only", default=None, help="t4: perturbation names separated by |")
+    ap.add_argument("--prices", default=None, help="e2: prices (USD/GPU-h) separated by |, for split runs")
     ap.add_argument("--duration", type=float, default=None, help="e1: only events of this length (h), for split runs")
     ap.add_argument("--cut", type=float, default=None, help="e1: only events with this cut, for split runs")
     ap.add_argument("--lookup-rule", default=None, choices=["contract", "hold_beyond_grid"], help="e3: S14c prediction lookup rule beyond the last grid point")
@@ -415,7 +426,8 @@ def main(argv=None):
     elif args.exp == "t4":
         rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)
     else:
-        rows = {"e1": e1, "e2": e2, "e2b": e2b}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick)
+        extra = dict(prices=[float(x) for x in args.prices.split("|")]) if (args.exp == "e2" and args.prices) else {}
+        rows = {"e1": e1, "e2": e2, "e2b": e2b}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
     if args.tag:                                          # split runs: one file per piece, merged by the analysis script
         out = Path(out_dir) / args.exp
         out.mkdir(parents=True, exist_ok=True)

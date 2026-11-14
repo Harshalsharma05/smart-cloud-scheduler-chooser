@@ -110,6 +110,7 @@ does not depend on them.
 - [x] **24c. [T2] S14c E3 re-run with lookup_rule = hold_beyond_grid** (declared 2026-11-14 after S14b; contract rule kept as baseline).
 - [x] **25. [T2] S13 E2 sweeps + sensitivity** (2 h; reduced grid is fine).
 - [x] **25b. [T2] S13b Diagnostics of the S13 results** (migrate/restore, oracle mechanism, absolute table; measurement only).
+- [x] **25c. [T2] S13c Sweeps and T4 redone under hold_beyond_grid** (contract-rule results kept in results/*_contract).
 - [ ] **26. [T2] S15 E5 carbon** (1.5 h; **trim**: one paragraph if short of time).
 - [x] **27. [T2] S9 Utilisation join** (3-5 h; **trim**: skip and keep the cluster-average fallback if short of time).
       If done, re-run step 19 quickly so E1 uses real utilisation.
@@ -235,5 +236,6 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-14 | 20a (W5a) | f31a476 | drafted: title and 194-word abstract in paper/main.tex and abstract.txt; ABSTRACT_CLAIMS.md checks every number (burst/delay 121-125x at w_fail 0 slightly above "120"; "few percent cheaper" holds for mix-p90 only, p50 mix is 1.2% dearer); step 20 stays open ([You]) |
 | 2026-11-14 | 20b (W5b) | 4c5c675 | abstract revised (194 words); claims file updated: (c) 30-125x, (d) p90 only with p50 1.2% dearer at w_fail 0, (e) 40-70x from results/e3 contract vs hold; caveats: "median estimate is not cheaper" and "40-70x" hold at w_fail 0 only |
 | 2026-11-14 | 20c (W5c) | 4dafc99 | abstract wording fixed: mix-p90 cheaper than delay in both cost weightings (0.945 / 0.941); naive-reading penalty 10-70x (39-68x w_fail 0, 11-22x w_fail 1) |
+| 2026-11-14 | 25c (S13c) | HASH | 12 parts in parallel, ~19 min; mix-p90/transformer wins all 12 sweep-A cells and all pool x price cells (0.83-0.89 x delay, cheaper in 8-10 of 10 events) but its burst share is ~1%: gain is the cap, vanishes with the pessimistic cap curve; burst-only 18-260x delay, never wins; mix with last2 5-52x; migrate x2 selection effect gone (burst +0.06%); sanity checks 0 difference |
 | 2026-11-14 | 21 (T4) | e12119d | test pinball: gbdt 0.419, lightgbm 0.426, transformer 0.442, last2 1.034; AUROC Failed ~0.80 for all learned; status log-loss lightgbm 0.678 vs prior 0.888; oracle perfect; 6 tests pass |
 | 2026-11-14 | 22 (T5) | 487709e | gbdt/lightgbm/transformer.csv over export keys (111,451 rows each); 5 checker OKs; test metrics from CSVs match evaluate (max diff 2.5e-8) |
