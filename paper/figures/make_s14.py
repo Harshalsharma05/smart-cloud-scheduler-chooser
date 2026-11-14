@@ -80,29 +80,52 @@ def paired(df):
     return pd.DataFrame(rows)
 
 
-def f8(df):
+def f8(df, name="f8_selectors"):
+    """F8 selector comparison, default cell, p50 variants. df may have a 'rule' column (contract / hold): the contract rule is drawn
+    as faded, outlined bars next to the solid hold bars. Grey-print safe: stack components differ in grey level and hatch."""
+    from matplotlib.patches import Patch
     d = df[(df["part"] == "default") & (df["feasible"]) & (df["variant"] == "p50")]
+    if "rule" not in d:
+        d = d.assign(rule="hold")
+    rules = [r for r in ("contract", "hold") if r in set(d["rule"])]
     order = ["none-largest", "random"] + PREDS
-    fig, axes = plt.subplots(1, 3, figsize=(WIDTH_IN, 2.4), constrained_layout=True, sharey=True)
     y = np.arange(len(order))
-    for pol, off in (("burst", -0.2), ("mix", 0.2)):
-        v = [d[(d["policy"] == pol) & (d["sel"] == s)]["usd_per_mwh"].median() / 1000 for s in order]
-        axes[0].barh(y + off, v, 0.4, color=COLORS[pol], label=pol)
+    fig, axes = plt.subplots(1, 3, figsize=(2 * WIDTH_IN, 2.6), sharey=True)
+    fig.subplots_adjust(left=0.10, right=0.99, top=0.90, bottom=0.34, wspace=0.08)
+    h = 0.8 / (2 * len(rules))
+    for i, pol in enumerate(("burst", "mix")):
+        for k, rule in enumerate(rules):
+            v = [d[(d["rule"] == rule) & (d["policy"] == pol) & (d["sel"] == s)]["usd_per_mwh"].median() / 1000 for s in order]
+            fade = rule == "contract" and len(rules) > 1
+            axes[0].barh(y - 0.4 + h * (2 * i + k + 0.5), v, h, color=COLORS[pol], alpha=0.4 if fade else 1.0,
+                         edgecolor=COLORS[pol], lw=0.6)
     axes[0].set_xscale("log")
-    axes[0].set_title("k$/MWh shed (median)")
-    axes[0].legend(frameon=False, loc="lower right")
-    comp = [("useful_usd", "useful", "#7f7f7f"), ("cloud_waste_short_usd", "short remaining", "#f2cf5b"), ("cloud_waste_fail_usd", "Failed/Killed", "#d1495b")]
-    for ax, pol in ((axes[1], "burst"), (axes[2], "mix")):
-        left = np.zeros(len(order))
-        for col, lab, c in comp:
-            v = np.array([d[(d["policy"] == pol) & (d["sel"] == s)][col].mean() for s in order]) / 1000
-            ax.barh(y, v, 0.6, left=left, color=c, label=lab)
-            left += v
-        ax.set_title(f"{pol}: cloud k$/event")
-    axes[2].legend(frameon=False, loc="lower right")
+    axes[0].set_title("(a) cost, k$/MWh shed")
+    comp = [("useful_usd", "useful", "#d9d9d9", ""), ("cloud_waste_short_usd", "short remaining", "#8c8c8c", ".."),
+            ("cloud_waste_fail_usd", "Failed/Killed", "#303030", "//")]
+    for ax, pol, title in ((axes[1], "burst", "(b) burst: cloud k$/event"), (axes[2], "mix", "(c) mix: cloud k$/event")):
+        for k, rule in enumerate(rules):
+            left = np.zeros(len(order))
+            for col, lab, c, hatch in comp:
+                v = np.array([d[(d["rule"] == rule) & (d["policy"] == pol) & (d["sel"] == s)][col].mean() for s in order]) / 1000
+                fade = rule == "contract" and len(rules) > 1
+                ax.barh(y - 0.2 + 0.4 * k, v, 0.38, left=left, color=c, hatch=hatch, alpha=0.45 if fade else 1.0, edgecolor="black", lw=0.4)
+                left += v
+        ax.set_title(title)
+    for ax in axes:
+        ax.tick_params(labelsize=6.5)
+        ax.grid(axis="x", lw=0.3, color="0.8")
+        ax.set_axisbelow(True)
     axes[0].set_yticks(y, order)
     axes[0].invert_yaxis()
-    save(fig, "f8_selectors")
+    handles = [Patch(color=COLORS["burst"], label="burst"), Patch(color=COLORS["mix"], label="mix")]
+    if len(rules) > 1:
+        handles += [Patch(facecolor="0.6", alpha=0.4, edgecolor="black", label="contract rule (faded)"), Patch(facecolor="0.4", edgecolor="black", label="hold rule (solid)")]
+    handles += [Patch(facecolor=c, hatch=hh, edgecolor="black", lw=0.4, label=f"cloud $: {lab}") for _, lab, c, hh in comp]
+    fig.legend(handles=handles, loc="lower center", ncol=4, frameon=False, fontsize=6.5, handleheight=1.4, labelspacing=0.6, bbox_to_anchor=(0.5, 0.0))
+    path = save(fig, name)
+    fig.savefig(path.with_suffix(".png"), dpi=200)
+    plt.close(fig)
 
 
 def t3(df, metrics):

@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from make_s14 import LEARNED, PARTS, PREDS, load  # noqa: E402
+from make_s14 import LEARNED, PARTS, PREDS, f8, load  # noqa: E402
 from style import COLORS, RESULTS, ROOT, WIDTH_IN, plt, save  # noqa: E402
 
 LAST_GRID = 43200
@@ -53,33 +53,6 @@ def compare(d):
                                      median_cloud=s["cloud_usd"].median(), median_burst_jobs=s["n_burst"].median(),
                                      burst_past_grid=pg[rule].get((p, var), np.nan) if part == "default" and pol == "mix" else np.nan))
     return pd.DataFrame(rows)
-
-
-def f8(d):
-    x = d[(d["part"] == "default") & (d["variant"] == "p50")]
-    order = ["none-largest", "random"] + PREDS
-    fig, axes = plt.subplots(1, 3, figsize=(WIDTH_IN, 2.5), constrained_layout=True, sharey=True)
-    y = np.arange(len(order))
-    for pol, off in (("burst", -0.3), ("mix", 0.1)):
-        for k, rule in enumerate(("contract", "hold")):
-            v = [x[(x["rule"] == rule) & (x["policy"] == pol) & (x["sel"] == s)]["usd_per_mwh"].median() / 1000 for s in order]
-            axes[0].barh(y + off + 0.2 * k, v, 0.2, color=COLORS[pol], alpha=0.35 if rule == "contract" else 1.0, label=f"{pol}" if rule == "hold" else None)
-    axes[0].set_xscale("log")
-    axes[0].set_title("k$/MWh shed (median)")
-    axes[0].legend(frameon=False, loc="lower right")
-    comp = [("useful_usd", "useful", "#7f7f7f"), ("cloud_waste_short_usd", "short remaining", "#f2cf5b"), ("cloud_waste_fail_usd", "Failed/Killed", "#d1495b")]
-    for ax, pol in ((axes[1], "burst"), (axes[2], "mix")):
-        for k, rule in enumerate(("contract", "hold")):
-            left = np.zeros(len(order))
-            for col, lab, c in comp:
-                v = np.array([x[(x["rule"] == rule) & (x["policy"] == pol) & (x["sel"] == s)][col].mean() for s in order]) / 1000
-                ax.barh(y - 0.2 + 0.4 * k, v, 0.38, left=left, color=c, alpha=0.35 if rule == "contract" else 1.0, label=lab if (k == 1) else None)
-                left += v
-        ax.set_title(f"{pol}: cloud k$/event")
-    axes[2].legend(frameon=False, loc="lower right")
-    axes[0].set_yticks(y, order)
-    axes[0].invert_yaxis()
-    save(fig, "f8_selectors")
 
 
 def t3(d, metrics):

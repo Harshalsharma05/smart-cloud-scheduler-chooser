@@ -116,6 +116,7 @@ does not depend on them.
 
 ### Block H: finish the paper (~8-10 h)
 
+- [x] **28a. [T2] S16a hold_beyond_grid default; E1/E4 re-run (last2, transformer, oracle); F1/F6/F8/F9/T2/T3 redone; attribution control** (brought forward part of 28).
 - [ ] **28. [T2] S16 Final numbers and figures** (2 h): E1/E3 re-run with the transformer as the realistic predictor;
       `paper/numbers.tex`.
 - [ ] **29. [You + Track 2 chat] W6-W8** (≈8 h): methodology, evaluation text, final pass, page fit, double-blind
@@ -230,5 +231,6 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-14 | 24 (S14) | c2eae8b | E3 on Philly, 3 parts x ~8 min in parallel; no learned predictor beats last2 on median cost (mix: gbdt 1.9x, lightgbm 2.3x, transformer 1.09x; 5/10 events cheaper); oracle mix 0.002x last2 (w_fail 0); p90 cuts mix cost for all three learned (transformer 101k -> 47k $/event) but not below delay; out-of-sample run same picture; ~24% of running GPUs fall back to oracle values (censored carry-over); F8, T3 written |
 | 2026-11-14 | 24b (S14b) | 1060059 | 87% of running jobs are past 43,200 s (median elapsed 237 h); mix bursts 98-100% such jobs, 99-100% at the 60 s floor (gap > grid p50) vs 29-48% of all running; 98-100% of the cloud $ goes to them although actual remaining is median 35-70 h; lookup rule makes learned-predictor E3 result mostly an artifact for long jobs (rule not changed) |
 | 2026-11-14 | 24c (S14c) | 10743b2 | hold_beyond_grid: default-cell mix with gbdt/lightgbm/transformer falls from 224k/257k/102k to 1.5k/1.8k/1.5k $/event (p90: 1.2-1.3k), burst 272k/286k/281k -> 191k/159k/174k; mix now cheaper than delay/last2 in only 4-6 of 10 events (p50), 7-8 (p90); last2 also changes under the rule (mix 85k -> 52k), blind and oracle rows identical; no predictor claimed best |
+| 2026-11-14 | 28a (S16a) | HASH | hold_beyond_grid is the default; E1 90 events (6 infeasible, all 30% cells), 9 parts in parallel 7 min; transformer: delay wins 3 cells (10% cuts), mix-p90 6 (w_fail 1: mix-p90 9); last2: delay all 9; oracle: mix 7; mix vs delay/transformer cheaper in 35/84 events (median ratio 1.012), p90 66/84 (0.945); mix gain: delay -$188, cloud +$101 per event, 34 fewer suspensions, cap 0.6; zero-burst events still cheaper |
 | 2026-11-14 | 21 (T4) | e12119d | test pinball: gbdt 0.419, lightgbm 0.426, transformer 0.442, last2 1.034; AUROC Failed ~0.80 for all learned; status log-loss lightgbm 0.678 vs prior 0.888; oracle perfect; 6 tests pass |
 | 2026-11-14 | 22 (T5) | 487709e | gbdt/lightgbm/transformer.csv over export keys (111,451 rows each); 5 checker OKs; test metrics from CSVs match evaluate (max diff 2.5e-8) |

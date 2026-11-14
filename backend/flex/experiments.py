@@ -73,6 +73,8 @@ def load_predictors(cfg, data):
     """Every prediction file that exists; the missing names are listed, never faked."""
     pdir = predictions_dir(cfg, data)
     found = {n: load_predictions(pdir / f"{n}.csv") for n in ALL_PREDICTORS if (pdir / f"{n}.csv").exists()}
+    for pr in found.values():
+        pr.lookup_rule = cfg.get("lookup_rule", "contract")
     missing = [n for n in ALL_PREDICTORS if n not in found]
     if missing:
         print("prediction files not found (not run):", ", ".join(missing))
@@ -119,14 +121,23 @@ def timed_row(cfg, exp, snap, ev, name, world, base, predictor_name="", selector
 # ---- experiments ----
 
 def e1(cfg, jobs, pool, events, predictors, predictor, quick):
-    """Policies delay, cap, burst, mix on every event; mix with the oracle as the upper bound."""
+    """S16a. Per event: cap (no predictor); delay, burst, mix with last2, transformer and the oracle (upper bound);
+    mix with the p90 cloud bill (transformer); in the default cell also delay with gbdt and lightgbm (attribution control)."""
     world = world_from_config(cfg, predictors[predictor])
+    names = [n for n in ("last2", "transformer", "oracle") if n in predictors]
 
     def per_event(snap, ev, base):
-        rows = [timed_row(cfg, "e1", snap, ev, n, world, base, predictor) for n in ("delay", "cap", "burst", "mix")]
-        if "oracle" in predictors and predictor != "oracle":
-            w = dataclasses.replace(world, predictor=predictors["oracle"])
-            rows += [timed_row(cfg, "e1", snap, ev, n, w, base, "oracle", setting="upper-bound") for n in ("mix", "delay")]
+        rows = [timed_row(cfg, "e1", snap, ev, "cap", world, base, pool=pool)]
+        for pname in names:
+            w = dataclasses.replace(world, predictor=predictors[pname])
+            rows += [timed_row(cfg, "e1", snap, ev, n, w, base, pname, pool=pool) for n in ("delay", "burst", "mix")]
+            if pname == "transformer":
+                rows.append(timed_row(cfg, "e1", snap, ev, "mix", dataclasses.replace(w, cost_quantile="p90"), base, pname, setting="cq=p90", pool=pool))
+        if (ev.duration_h, ev.cut) == DEFAULT_EVENT:
+            for pname in ("gbdt", "lightgbm"):
+                if pname in predictors:
+                    rows.append(timed_row(cfg, "e1", snap, ev, "delay", dataclasses.replace(world, predictor=predictors[pname]), base, pname,
+                                          setting="attribution", pool=pool))
         return rows
     return run_events(cfg, jobs, pool, world, events, per_event, "e1")
 
@@ -322,7 +333,7 @@ def e4_from_e1(out_dir, summary_only=False):
     """E4 reads the E1 runs: user impact and rebound."""
     runs = pd.read_csv(Path(out_dir) / "e1" / "runs.csv")
     cols = ["event_id", "duration_h", "cut", "policy", "selector", "predictor", "setting", "d_wait_min", "d_slowdown",
-            "rebound_mwh", "missed_deadlines", "dgpuh_good", "dgpuh_all", "n_suspended", "n_burst", "cap_level"]
+            "rebound_mwh", "missed_deadlines", "dgpuh_good", "dgpuh_all", "n_suspended", "n_burst", "cap_level", "feasible"]
     out = Path(out_dir) / "e4"
     out.mkdir(parents=True, exist_ok=True)
     runs[cols].to_csv(out / "runs.csv", index=False)
@@ -347,14 +358,16 @@ def baseline_waits(cfg, jobs, pool, out_dir, label):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m flex.experiments")
-    ap.add_argument("exp", choices=["e1", "e2", "e2b", "e3", "e4", "e5", "t4"])
+    ap.add_argument("exp", choices=["e1", "e1merge", "e2", "e2b", "e3", "e4", "e5", "t4"])
     ap.add_argument("--data", choices=["synthetic", "philly"], required=True)
     ap.add_argument("--predictor", default="last2")
     ap.add_argument("--quick", action="store_true", help="3 events per cell (and smaller sweeps)")
     ap.add_argument("--out", default=None, help="results directory (default: <repo>/results)")
     ap.add_argument("--pool", default=None, help="e2b: installed | auto | 0.95 | 0.9 (x auto); sets philly.pool_gpus")
     ap.add_argument("--only", default=None, help="t4: perturbation names separated by |")
-    ap.add_argument("--lookup-rule", default="contract", choices=["contract", "hold_beyond_grid"], help="e3: S14c prediction lookup rule beyond the last grid point")
+    ap.add_argument("--duration", type=float, default=None, help="e1: only events of this length (h), for split runs")
+    ap.add_argument("--cut", type=float, default=None, help="e1: only events with this cut, for split runs")
+    ap.add_argument("--lookup-rule", default=None, choices=["contract", "hold_beyond_grid"], help="e3: S14c prediction lookup rule beyond the last grid point")
     ap.add_argument("--part", default="default", choices=list(E3_PARTS), help="e3: default | hard | oos")
     ap.add_argument("--tag", default="", help="suffix of the runs file for split runs (runs_<tag>.csv)")
     args = ap.parse_args(argv)
@@ -362,6 +375,13 @@ def main(argv=None):
     out_dir = Path(args.out) if args.out else ROOT / cfg["paths"]["results"]
     if args.exp == "e5":
         raise SystemExit("e5 (carbon) is phase S15")
+    if args.exp == "e1merge":                                # S16a: merge the split E1 runs (runs_<tag>.csv) into runs.csv and summary.csv
+        files = sorted((out_dir / "e1").glob("runs_*.csv"))
+        runs = pd.concat([pd.read_csv(f, dtype={"selector": str, "predictor": str, "setting": str}) for f in files], ignore_index=True)
+        runs.to_csv(out_dir / "e1" / "runs.csv", index=False)
+        summarise(runs).to_csv(out_dir / "e1" / "summary.csv", index=False)
+        print(f"merged {len(files)} files, {len(runs)} rows, {runs['event_id'].nunique()} events")
+        return
     if args.exp == "e4":
         if not (out_dir / "e1" / "runs.csv").exists():
             main(["e1", "--data", args.data, "--predictor", args.predictor] + (["--quick"] if args.quick else [])
@@ -375,6 +395,8 @@ def main(argv=None):
         auto = d["pool_gpus"]
         cfg["philly"]["pool_gpus"] = {"installed": d["installed_gpus"], "auto": "auto"}.get(args.pool, None) or int(round(float(args.pool) * auto))
     cfg, jobs, pool, events = load_setup(cfg, args.data, args.quick)
+    if args.exp == "e1" and (args.duration is not None or args.cut is not None):
+        events = [e for e in events if (args.duration is None or e.duration_h == args.duration) and (args.cut is None or abs(e.cut - args.cut) < 1e-9)]
     predictors = load_predictors(cfg, args.data)
     if args.predictor not in predictors:
         raise SystemExit(f"no predictions/{args.predictor}.csv for --data {args.data}")
@@ -385,9 +407,10 @@ def main(argv=None):
         from traces.philly import ml_config, utc_epoch
         mc = ml_config()
         min_sub = utc_epoch(mc.TEST_START) - utc_epoch(mc.SIM_START) if args.data == "philly" else None
+        rule = args.lookup_rule or cfg.get("lookup_rule", "contract")
         for pr in predictors.values():
-            pr.lookup_rule = args.lookup_rule
-        args.tag = args.tag or (args.part + ("_hold" if args.lookup_rule != "contract" else ""))
+            pr.lookup_rule = rule
+        args.tag = args.tag or (args.part + ("_hold" if rule != "contract" else ""))
         rows = e3(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.part, min_sub)
     elif args.exp == "t4":
         rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)

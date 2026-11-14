@@ -1,5 +1,5 @@
 """F1 (teaser): facility power over the default event (first 2 h, 20% event) for the baseline, delay, cap, burst and mix
-(last2 predictor), with the target P*. Re-runs one event from backend/ code. Run from the repo root."""
+(transformer predictor, hold_beyond_grid lookup), with the target P*. Re-runs one event from backend/ code. Run from the repo root."""
 import sys
 from pathlib import Path
 
@@ -20,7 +20,9 @@ from traces.philly import load_philly  # noqa: E402
 
 cfg = load_config()
 L = load_philly(cfg)
-world = world_from_config(cfg, load_predictions(ROOT / cfg["paths"]["predictions"] / "last2.csv"))
+pred = load_predictions(ROOT / cfg["paths"]["predictions"] / "transformer.csv")
+pred.lookup_rule = cfg.get("lookup_rule", "contract")
+world = world_from_config(cfg, pred)
 ev = [e for e in L["events"] if e.duration_h == 2 and abs(e.cut - 0.2) < 1e-9][0]
 eng = Engine(copy.deepcopy(L["jobs"]), L["G"], check_every=cfg["check_every"], cloud=Cloud(world.cloud))
 (_, snap), = baseline_snapshots(eng, [ev.t_start])
@@ -42,7 +44,7 @@ fig, ax = new_figure(2.3)
 x, y = steps(base.tracker)
 ax.plot(x, y, color="0.5", lw=1, label="baseline")
 for name in ("delay", "cap", "burst", "mix"):
-    _, _, pol = run_policy(snap, ev, name, world, "last2", "predictor", cfg["seed"], base, return_runs=True)
+    _, _, pol = run_policy(snap, ev, name, world, "transformer", "predictor", cfg["seed"], base, return_runs=True)
     x, y = steps(pol.tracker)
     ax.plot(x, y, color=COLORS[name], lw=0.9, label=name)
 ax.axhline(p_star, color="k", ls=":", lw=0.8, label="target P*")

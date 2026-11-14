@@ -7,6 +7,7 @@ paths:                  # relative to the repo root
   results: results
 
 seed: 1                 # ASSUMPTION: default seed for synthetic runs
+lookup_rule: hold_beyond_grid   # ASSUMPTION (decision 2026-11-14, SIM_PLAN S16a): contract | hold_beyond_grid; non-oracle predictions beyond the last grid point (43,200 s) are held at the last row instead of the gap being subtracted (S14b/S14c)
 check_every: 1000       # ASSUMPTION: full safety check every N events on large runs (tests use 1)
 
 synthetic:              # synthetic test data only, never used for paper numbers

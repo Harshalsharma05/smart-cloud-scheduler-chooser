@@ -11,7 +11,7 @@ from style import ROOT, load_runs  # noqa: E402
 
 runs = load_runs("e1")
 runs = runs[(runs["duration_h"] == 2) & (runs["cut"].sub(0.2).abs() < 1e-9)]
-order = ["delay", "cap", "burst", "mix", "delay+oracle", "mix+oracle"]
+order = ["delay", "cap", "burst", "mix", "mix-p90", "delay (last2)", "burst (last2)", "mix (last2)", "delay+oracle", "burst+oracle", "mix+oracle"]
 rows = []
 for w in order:
     s = runs[runs["who"] == w]
