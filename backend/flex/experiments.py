@@ -259,6 +259,41 @@ def t4(cfg, jobs, pool, events, predictors, predictor, quick, only=None):
     return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "t4")
 
 
+def nocloud_world(world, predictor, quantile="p50"):
+    """S13d control: the same mix controller and predictor, cloud switched off (max_cloud_gpus = 0). Every planned burst is refused,
+    so the mix can only delay (a refused burst becomes a suspension) and cap. The controller logic is not changed."""
+    w = cloud_variant(world, world.cloud.price_per_gpu_h, world.cloud.boot_delay_s, 0)
+    return dataclasses.replace(w, predictor=predictor, cost_quantile=quantile)
+
+
+def e1nc(cfg, jobs, pool, events, predictors, predictor, quick):
+    """S13d (1): mix-nocloud on the E1 events with last2, transformer (p50 and p90) and the oracle."""
+    world = world_from_config(cfg, predictors[predictor])
+
+    def per_event(snap, ev, base):
+        rows = [timed_row(cfg, "e1nc", snap, ev, "mix", nocloud_world(world, predictors[p]), base, p, setting="nocloud", pool=pool)
+                for p in ("last2", "transformer", "oracle")]
+        rows.append(timed_row(cfg, "e1nc", snap, ev, "mix", nocloud_world(world, predictors["transformer"], "p90"), base, "transformer",
+                              setting="nocloud;cq=p90", pool=pool))
+        return rows
+    return run_events(cfg, jobs, pool, world, events, per_event, "e1nc")
+
+
+def e2nc(cfg, jobs, pool, events, predictors, predictor, quick):
+    """S13d (2): mix-nocloud (transformer p90, oracle) on the default cell for ONE pool (--pool) and prices 0.43 and 3.06."""
+    world = world_from_config(cfg, predictors[predictor])
+    boot = cfg["cloud"]["boot_delay_s"]
+
+    def per_event(snap, ev, base):
+        rows = []
+        for price in (0.43, 3.06):
+            for p, q in (("transformer", "p90"), ("oracle", "p50")):
+                w = nocloud_world(cloud_variant(world, price, boot, 0), predictors[p], q)
+                rows.append(timed_row(cfg, "e2nc", snap, ev, "mix", w, base, p, setting=setting_text(pool, price, boot, 0) + (";cq=p90" if q == "p90" else ""), pool=pool))
+        return rows
+    return run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "e2nc")
+
+
 E3_PARTS = {"default": (DEFAULT_EVENT, 1000, False), "hard": (HARD_EVENT, 3000, False), "oos": (DEFAULT_EVENT, 1000, True)}
 LEARNED = ["gbdt", "lightgbm", "transformer"]         # last2 has p90 = p50, so its p90 variant would be identical
 
@@ -368,7 +403,7 @@ def baseline_waits(cfg, jobs, pool, out_dir, label):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m flex.experiments")
-    ap.add_argument("exp", choices=["e1", "e1merge", "e2", "e2b", "e3", "e4", "e5", "t4"])
+    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4"])
     ap.add_argument("--data", choices=["synthetic", "philly"], required=True)
     ap.add_argument("--predictor", default="last2")
     ap.add_argument("--quick", action="store_true", help="3 events per cell (and smaller sweeps)")
@@ -400,13 +435,13 @@ def main(argv=None):
         e4_from_e1(out_dir)
         print("wrote", out_dir / "e4")
         return
-    if args.exp == "e2b":
+    if args.exp in ("e2b", "e2nc"):
         from traces.philly_pool import load_pool
         d = load_pool()
         auto = d["pool_gpus"]
         cfg["philly"]["pool_gpus"] = {"installed": d["installed_gpus"], "auto": "auto"}.get(args.pool, None) or int(round(float(args.pool) * auto))
     cfg, jobs, pool, events = load_setup(cfg, args.data, args.quick)
-    if args.exp == "e1" and (args.duration is not None or args.cut is not None):
+    if args.exp in ("e1", "e1nc") and (args.duration is not None or args.cut is not None):
         events = [e for e in events if (args.duration is None or e.duration_h == args.duration) and (args.cut is None or abs(e.cut - args.cut) < 1e-9)]
     predictors = load_predictors(cfg, args.data)
     if args.predictor not in predictors:
@@ -427,7 +462,7 @@ def main(argv=None):
         rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)
     else:
         extra = dict(prices=[float(x) for x in args.prices.split("|")]) if (args.exp == "e2" and args.prices) else {}
-        rows = {"e1": e1, "e2": e2, "e2b": e2b}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
+        rows = {"e1": e1, "e1nc": e1nc, "e2": e2, "e2b": e2b, "e2nc": e2nc}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
     if args.tag:                                          # split runs: one file per piece, merged by the analysis script
         out = Path(out_dir) / args.exp
         out.mkdir(parents=True, exist_ok=True)
