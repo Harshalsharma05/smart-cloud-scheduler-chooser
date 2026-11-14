@@ -354,6 +354,7 @@ def main(argv=None):
     ap.add_argument("--out", default=None, help="results directory (default: <repo>/results)")
     ap.add_argument("--pool", default=None, help="e2b: installed | auto | 0.95 | 0.9 (x auto); sets philly.pool_gpus")
     ap.add_argument("--only", default=None, help="t4: perturbation names separated by |")
+    ap.add_argument("--lookup-rule", default="contract", choices=["contract", "hold_beyond_grid"], help="e3: S14c prediction lookup rule beyond the last grid point")
     ap.add_argument("--part", default="default", choices=list(E3_PARTS), help="e3: default | hard | oos")
     ap.add_argument("--tag", default="", help="suffix of the runs file for split runs (runs_<tag>.csv)")
     args = ap.parse_args(argv)
@@ -384,7 +385,9 @@ def main(argv=None):
         from traces.philly import ml_config, utc_epoch
         mc = ml_config()
         min_sub = utc_epoch(mc.TEST_START) - utc_epoch(mc.SIM_START) if args.data == "philly" else None
-        args.tag = args.tag or args.part
+        for pr in predictors.values():
+            pr.lookup_rule = args.lookup_rule
+        args.tag = args.tag or (args.part + ("_hold" if args.lookup_rule != "contract" else ""))
         rows = e3(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.part, min_sub)
     elif args.exp == "t4":
         rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)

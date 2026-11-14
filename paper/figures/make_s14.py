@@ -23,10 +23,10 @@ PREDS = ["last2", "gbdt", "lightgbm", "transformer", "oracle"]
 LEARNED = ["gbdt", "lightgbm", "transformer"]
 
 
-def load():
+def load(suffix=""):
     frames = []
     for p in PARTS:
-        f = RESULTS / "e3" / f"runs_{p}.csv"
+        f = RESULTS / "e3" / f"runs_{p}{suffix}.csv"
         if f.exists():
             d = pd.read_csv(f, dtype={"selector": str, "predictor": str, "setting": str})
             d["part"] = p

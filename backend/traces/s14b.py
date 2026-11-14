@@ -7,6 +7,7 @@ with the gap larger than the grid row's p50 ("exhausted"), actual remaining time
 Run from backend/:  python -m traces.s14b      (about 10 min: one baseline pass over the trace)
 Output: results/s14b/jobs.csv (one row per event x predictor x running job) and the printed tables.
 """
+import argparse
 import dataclasses
 from pathlib import Path
 
@@ -36,9 +37,14 @@ def lookup_detail(pred, job, elapsed):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--rule", default="contract", choices=["contract", "hold_beyond_grid"])
+    rule = ap.parse_args().rule
     cfg = load_config()
     cfg, jobs, pool, events = load_setup(cfg, "philly", False)
     preds = load_predictors(cfg, "philly")
+    for pr in preds.values():
+        pr.lookup_rule = rule
     base_world = world_from_config(cfg, preds["last2"])
     world = cloud_variant(base_world, cfg["cloud"]["price_per_gpu_h"], cfg["cloud"]["boot_delay_s"], 1000)
     rows = []
@@ -64,10 +70,10 @@ def main():
         return []
     run_events(cfg, jobs, pool, world, cell(events, *DEFAULT_EVENT), per_event, "s14b")
     df = pd.DataFrame(rows)
-    out = ROOT / "results" / "s14b"
+    out = ROOT / "results" / "s14b" / ("" if rule == "contract" else "hold")
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "jobs.csv", index=False)
-    tables(df)
+    tables(df, out)
 
 
 def shares(d, w=None):
@@ -78,7 +84,7 @@ def shares(d, w=None):
     return beyond, floor, exh
 
 
-def tables(df):
+def tables(df, out):
     pd.set_option("display.width", 220, "display.max_columns", 40)
     res = []
     for pname, q in VARIANTS:
@@ -97,7 +103,7 @@ def tables(df):
             res.append(r)
     t = pd.DataFrame(res)
     print(t.round(3).to_string(index=False))
-    t.to_csv(ROOT / "results" / "s14b" / "tables.csv", index=False)
+    t.to_csv(out / "tables.csv", index=False)
     print("\nJobs beyond the last grid point: p50 / p90 at their last grid row (median, h) and the looked-up p50 (median, h)")
     rows = []
     for pname in PREDS:
@@ -107,7 +113,7 @@ def tables(df):
                              looked_up_p50_h=sub["p50"].median() / 3600, actual_rem_h=sub["actual_rem"].median() / 3600))
     t5 = pd.DataFrame(rows)
     print(t5.round(2).to_string(index=False))
-    t5.to_csv(ROOT / "results" / "s14b" / "beyond_grid.csv", index=False)
+    t5.to_csv(out / "beyond_grid.csv", index=False)
 
 
 if __name__ == "__main__":

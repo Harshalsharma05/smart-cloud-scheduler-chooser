@@ -1,11 +1,12 @@
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrrrrrr}
 \toprule
-Predictor & MAE$_{p50}$ (min) & Pinball & AUROC$_{fail}$ & mix k\$/MWh & burst k\$/MWh & mix cost (\$/event) \\
+Predictor & MAE$_{p50}$ & Pinball & AUROC$_{fail}$ & \multicolumn{2}{c}{mix k\$/MWh} & \multicolumn{2}{c}{burst k\$/MWh} & \multicolumn{2}{c}{mix \$/event} \\
+ & (min) & & & contract & hold & contract & hold & contract & hold \\
 \midrule
-last2 & 52.6 & 1.034 & 0.772 & 203.1 & 616 & 84{,}963 \\
-gbdt & 43.5 & 0.419 & 0.797 & 528.7 & 644 & 224{,}299 \\
-lightgbm & 45.0 & 0.426 & 0.800 & 607.5 & 676 & 256{,}947 \\
-transformer & 65.2 & 0.442 & 0.805 & 238.9 & 668 & 101{,}658 \\
-oracle & 0.0 & 0.000 & 1.000 & 0.5 & 187 & 213 \\
+last2 & 52.6 & 1.034 & 0.772 & 203.1 & 122.8 & 616 & 574 & 84{,}963 & 51{,}589 \\
+gbdt & 43.5 & 0.419 & 0.797 & 528.7 & 3.7 & 644 & 463 & 224{,}299 & 1{,}496 \\
+lightgbm & 45.0 & 0.426 & 0.800 & 607.5 & 4.5 & 676 & 384 & 256{,}947 & 1{,}819 \\
+transformer & 65.2 & 0.442 & 0.805 & 238.9 & 3.7 & 668 & 404 & 101{,}658 & 1{,}492 \\
+oracle & 0.0 & 0.000 & 1.000 & 0.5 & 0.5 & 187 & 187 & 213 & 213 \\
 \bottomrule
 \end{tabular}
