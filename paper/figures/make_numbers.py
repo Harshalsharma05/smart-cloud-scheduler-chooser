@@ -206,6 +206,13 @@ def compute():
                 put(f"Robust{fn}{pn}Total{k}", r.total_ratio, "f2")
                 put(f"Robust{fn}{pn}ReductionPct{k}", 100 * (1 - r.total_ratio), "int")
 
+    # E3 (default cell, hold rule): median mix cost per event (w_fail 0) with each predictor's own p50 estimate
+    e3h = pd.read_csv(RESULTS / "e3" / "runs_default_hold.csv", dtype={"setting": str, "predictor": str, "selector": str}).fillna("")
+    for p_, nm_ in PRED_NAMES.items():
+        q = e3h[(e3h.policy == "mix") & (e3h.predictor == p_) & (e3h.selector == f"predictor:{p_}") & ~e3h.setting.str.contains("cq=p90")]
+        if len(q):
+            put(f"Ethree{nm_}MixUsdEvent", q["cost_usd"].median(), "int")
+
     # ---- predictor accuracy (test split)
     pm_ = pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv", dtype={"elapsed_s": str})
     allr = pm_[pm_["elapsed_s"] == "all"].set_index("predictor")
@@ -216,7 +223,7 @@ def compute():
         put(f"Pred{nm}MaeMin", allr.loc[p, "mae_p50_min"], "f1")
         put(f"Pred{nm}Coverage", allr.loc[p, "coverage_p10_p90"], "f2")
         put(f"Pred{nm}Logloss", allr.loc[p, "logloss"], "f3")
-        put(f"Pred{nm}Auroc", allr.loc[p, "auroc_failed"], "f2")
+        put(f"Pred{nm}Auroc", allr.loc[p, "auroc_failed"], "f3")
     put("PredTestRows", allr.loc["last2", "n"], "int")
 
     # ---- E5 carbon

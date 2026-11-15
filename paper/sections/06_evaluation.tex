@@ -1,4 +1,53 @@
-% Page budget: 2.8 pages. 6.1 E1 cost of flexibility (F6, T2); 6.2 E2 when burst wins (F7, T4); 6.3 E3 does prediction help (F8, T3); 6.4 E4 user impact (F9); 6.5 E5 carbon.
+% Page budget: 2.2 pages including floats (W7). Floats: Table tab:main, Fig. fig:eone (F6), Fig. fig:selectors (F8). Carbon is text only.
+% Every result number is a macro from numbers.tex (make_numbers.py). Design constants may be literals.
 \section{Evaluation}
 \label{sec:eval}
-Placeholder paragraph for the evaluation.
+All results use the \SetupEventsFeasible{} feasible events; the \SetupEventsInfeasible{} infeasible ones (Section~\ref{sec:method}) are excluded everywhere. Unless stated otherwise, the predictor is the transformer, the lookup rule is hold-beyond-grid, and the cost uses $w_f=0$. Table~\ref{tab:main} gives the cost of each policy and Fig.~\ref{fig:eone} shows all nine cells.
+
+\input{tables/t_main}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/out/e1_usd_per_mwh.pdf}
+\caption{Median cost per MWh shed (log scale, band: interquartile range) by event length, one panel per cut, $w_f=0$. Policies that comply in less than 99\% of the event are not plotted as a cost; their median shed, as a share of the target, is listed under each panel.}
+\label{fig:eone}
+\end{figure*}
+
+\subsection{Single actions}
+In the default cell, delay-only costs \$\DefDelayUsdZero{} per MWh at $w_f=0$ and \$\DefDelayUsdOne{} at $w_f=1$. It is the cheapest of the three single actions.
+Cap-only cannot meet the target. Even at the deepest cap level it sheds \DefCapSharePct\% of the target in the default cell, and it is non-compliant in \CapNoncompliantCells{} of the \CellsTotal{} cells.
+Burst-only complies but is expensive. In the default cell its per-event cost is \BurstOverDelayDefaultOne{} to \BurstOverDelayDefaultZero{} times that of delay-only ($w_f=1$ and $w_f=0$); over all \SetupEventsFeasible{} events the range is \BurstOverDelayAllOne{} to \BurstOverDelayAllZero{} times.
+The reason is that the cloud bill covers each burst job's whole remaining runtime, while the grid values only the hours of the event.
+
+\subsection{The mix controller}
+With the 90th-percentile cloud bill, the mix is cheaper than delay-only. Its per-event cost ratio to delay-only has a median of \MixPNineOverDelayZero{} at $w_f=0$ and \MixPNineOverDelayOne{} at $w_f=1$. It is cheaper in \MixPNineOverDelayCheaperZero{} and \MixPNineOverDelayCheaperOne{} of the \SetupEventsFeasible{} events. Summed over all events, its cost is \MixPNineOverDelayReductionPctZero\% ($w_f=0$) and \MixPNineOverDelayReductionPctOne\% ($w_f=1$) lower than that of delay-only.
+These are different statistics. The ``about 5\%'' gain is the median of per-event ratios; the total-cost reduction is larger. The \$/MWh columns of Table~\ref{tab:main} are medians of the default cell, so they need not agree with the ratio columns.
+With the median cloud bill, the mix does not help: its median ratio is \MixOverDelayZero{} at $w_f=0$, and it is cheaper in only \MixOverDelayCheaperZero{} events. With the last-two-jobs predictor the mix costs \MixLastTwoOverDelayZero{} times as much as delay-only at $w_f=0$.
+
+\subsection{Where the gain comes from}
+Mix-nocloud runs the same controller with no cloud capacity. For the transformer with the p90 bill, the median ratio of mix to mix-nocloud is \MixOverNocloudTransPNineZeroZero{} at $w_f=0$ and \MixOverNocloudTransPNineZeroOne{} at $w_f=1$. The gain over delay-only therefore comes from capping and from choosing which jobs to suspend, not from bursting: mix-nocloud alone has a median ratio to delay-only of \NocloudOverDelayZero{} ($w_f=0$) and \NocloudOverDelayOne{} ($w_f=1$).
+Bursting helps only with exact runtime knowledge. With the oracle, the median ratio of mix to mix-nocloud is \MixOverNocloudOracleZero{} over all events at $w_f=0$, and \MixOverNocloudOracleFourThirtyZero{} and \MixOverNocloudOracleFourTwentyZero{} in the 4\,h cells with 30\% and 20\% cuts. At $w_f=1$ it is \MixOverNocloudOracleOne{} overall and \MixOverNocloudOracleFourThirtyOne{} at 4\,h and 30\%.
+The cloud limit of \SetupCloudCapGpus{} GPUs also matters: burst-only complies in \BurstThirtyCompliantEvents{} of the \BurstThirtyEvents{} events with a 30\% cut. In a diagnostic run on \DiagCapThreeKEvents{} such events (last-two-jobs predictor, contract rule) with 3,000 cloud GPUs, burst-only complied in \DiagCapThreeKCompliantEvents{}, at a cloud bill of \$\DiagCapThreeKCloudKusdMin{}k to \$\DiagCapThreeKCloudKusdMax{}k per event.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/out/f8_selectors.pdf}
+\caption{Burst selection by predictor in the default cell. (a) Median cost per MWh for burst-only and the mix. (b, c) Median cloud cost per event, split into useful work, jobs with a short remaining runtime, and Failed/Killed jobs. Faded bars: contract lookup rule; solid bars: hold-beyond-grid rule.}
+\label{fig:selectors}
+\end{figure*}
+
+\subsection{Predictions for long-running jobs}
+How a prediction is read beyond the last grid point decides the result. Under the contract rule, the transformer mix costs \ContractOverHoldMin{} to \ContractOverHoldMax{} times as much per event as under the hold-beyond-grid rule, depending on the cloud-bill quantile and $w_f$ (Fig.~\ref{fig:selectors}).
+The cause is the running population at an event: \MotRunningBeyondGridJobsPct\% of the running jobs have run longer than 12\,h. Under the contract rule their predicted remaining runtime falls to the 60\,s floor. In the default cell, \ContractBurstFloorMinPct\% to \ContractBurstFloorMaxPct\% of the jobs that the mix bursts are at this floor, against \ContractRunningFloorMinPct\% to \ContractRunningFloorMaxPct\% of all running jobs. Their actual remaining runtime has a median of \ContractBurstActualRemMinH{} to \ContractBurstActualRemMaxH{} hours, so the cloud bills many hours that the controller did not expect.
+
+\subsection{Prediction accuracy and decision cost}
+Accuracy and decision cost do not rank the predictors in the same way. On the test split, gradient-boosted trees have the lowest pinball loss (\PredGbdtPinball{}, against \PredLightgbmPinball{} for LightGBM, \PredTransformerPinball{} for the transformer and \PredLastTwoPinball{} for last-two-jobs). The transformer has the highest AUROC for Failed jobs (\PredTransformerAuroc{}, against \PredLightgbmAuroc{}, \PredGbdtAuroc{} and \PredLastTwoAuroc{}).
+In the default cell, the median mix cost per event is \$\EthreeTransformerMixUsdEvent{} with the transformer, \$\EthreeGbdtMixUsdEvent{} with gradient-boosted trees, \$\EthreeLightgbmMixUsdEvent{} with LightGBM and \$\EthreeLastTwoMixUsdEvent{} with last-two-jobs. The oracle reaches \$\EthreeOracleMixUsdEvent{}. The learned predictors are close to each other; the gap to last-two-jobs and to the oracle is large.
+
+\subsection{Robustness}
+\emph{Cost weighting.} At $w_f=1$ the ranking of the single actions and the gain of the p90 mix are the same (Table~\ref{tab:main}); the median-bill mix reaches a ratio of \MixOverDelayOne{} there.
+\emph{Lookup rule.} The contract rule changes the learned-predictor results (above), not the oracle's.
+\emph{Clean jobs.} If only jobs submitted in the test window may be burst, so that every burst decision uses out-of-sample predictions, the median ratio of the p90 mix to delay-only in the default cell is \OosMixPNineOverDelayZero{} ($w_f=0$), as in the main run (\DefMixPNineOverDelayZero{}).
+\emph{Jobs without predictions.} If these jobs get fixed uninformed values (30 days of remaining runtime, no failure risk) instead of their true values, the median ratio of the p90 mix to delay-only is \RobustUninfMixOverDelayZero{} ($w_f=0$) and \RobustUninfMixOverDelayOne{} ($w_f=1$), unchanged. All of these jobs are censored and treated as Pass, and they have hundreds of hours left at every event, so both fallbacks lead to the same decisions.
+
+\input{sections/e5_snippet}

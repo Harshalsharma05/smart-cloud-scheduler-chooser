@@ -17,9 +17,9 @@ df = load_runs("e1")
 cuts = sorted(df["cut"].unique())
 durs = sorted(df["duration_h"].unique())
 who = [w for w in COLORS if w in set(df["who"])]
-fig, axes = plt.subplots(1, len(cuts), figsize=(WIDTH_IN * 2, 2.5), sharey=True, constrained_layout=True)
+fig, axes = plt.subplots(1, len(cuts), figsize=(WIDTH_IN * 2, 2.9), sharey=True, constrained_layout=True)
 for ax, cut in zip(np.atleast_1d(axes), cuts):
-    notes = []
+    notes = {}                                   # non-compliant policy -> shed % of target per event length
     for w in who:
         xs, med, lo, hi = [], [], [], []
         for d in durs:
@@ -27,7 +27,7 @@ for ax, cut in zip(np.atleast_1d(axes), cuts):
             if s.empty:
                 continue
             if s["compliance"].median() < 0.99:
-                notes.append(f"{w} {d:g} h: shed {s['shed_pct'].median():.0f}% of target")
+                notes.setdefault(w, {})[d] = f"{s['shed_pct'].median():.0f}"
                 continue
             v = s[col].dropna()
             if v.empty:
@@ -40,7 +40,11 @@ for ax, cut in zip(np.atleast_1d(axes), cuts):
     ax.set_xticks(durs, [f"{d:g}" for d in durs])
     ax.set_xlabel("event length (h)")
     ax.set_title(f"cut {round(cut * 100)}%")
-    ax.text(0.02, -0.38, "\n".join(notes), transform=ax.transAxes, fontsize=4.5, va="top")
+    if notes:                                    # one line per non-compliant policy: shed % of target at each event length
+        head = "not compliant, shed % of target at " + " / ".join(f"{d:g}" for d in durs) + " h:"
+        body = [f"{w}: " + " / ".join(v.get(d, "ok") for d in durs) for w, v in notes.items()]
+        ax.text(0.02, -0.30, "\n".join([head] + body), transform=ax.transAxes, fontsize=5.5, va="top")
 np.atleast_1d(axes)[0].set_ylabel("cost per MWh shed (k$/MWh)")
-np.atleast_1d(axes)[0].legend(frameon=False, ncol=1)
+h, l = np.atleast_1d(axes)[0].get_legend_handles_labels()
+fig.legend(h, l, loc="outside lower center", ncol=len(l), frameon=False)
 save(fig, "e1_usd_per_mwh" + ("_wfail1" if "wfail1" in sys.argv else ""))
