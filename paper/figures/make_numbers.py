@@ -226,6 +226,20 @@ def compute():
     put("InsampleRunningJobsPct", ri[ri.policy == "running_jobs_pct_median"].median_ratio.iloc[0], "int")
     put("InsampleRunningGpusPct", ri[ri.policy == "running_gpus_pct_median"].median_ratio.iloc[0], "int")
 
+    # W8: p90 mix vs delay-only with gbdt and lightgbm (each with its own delay-only; also vs the transformer's delay-only)
+    ls_ = pd.read_csv(RESULTS / "e1_learned" / "summary.csv")
+    nl = pd.concat([pd.read_csv(f, dtype={"selector": str, "predictor": str, "setting": str})
+                    for f in sorted((RESULTS / "e1_learned").glob("runs_*.csv"))]).fillna({"setting": ""})
+    nl = nl[nl["feasible"].astype(str) != "False"]
+    dly_all = e1[e1.who == "delay"].set_index("event_id")
+    for p_, nm_ in (("gbdt", "Gbdt"), ("lightgbm", "Lightgbm")):
+        for k, wn in (("Zero", "wfail0"), ("One", "wfail1")):
+            r = ls_[(ls_.predictor == p_) & (ls_.wfail == wn)].iloc[0]
+            put(f"Learned{nm_}MixOverDelay{k}", r.median_ratio, "f3")
+            put(f"Learned{nm_}MixCheaper{k}", r.cheaper, "int")
+            mixp = nl[(nl.policy == "mix") & (nl.predictor == p_) & (nl.setting == "cq=p90")].set_index("event_id")[W[k]]
+            put(f"Learned{nm_}MixOverTransDelay{k}", ratio_stats(mixp, dly_all[W[k]])[0], "f2")
+
     # ---- predictor accuracy (test split)
     pm_ = pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv", dtype={"elapsed_s": str})
     allr = pm_[pm_["elapsed_s"] == "all"].set_index("predictor")

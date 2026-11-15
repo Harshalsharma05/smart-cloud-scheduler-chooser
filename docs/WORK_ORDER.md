@@ -121,7 +121,7 @@ does not depend on them.
 - [x] **28a. [T2] S16a hold_beyond_grid default; E1/E4 re-run (last2, transformer, oracle); F1/F6/F8/F9/T2/T3 redone; attribution control** (brought forward part of 28).
 - [x] **28. [T2] S16 Final numbers and figures** (2 h): E1/E3 re-run with the transformer as the realistic predictor;
       `paper/numbers.tex`.
-- [ ] **29. [You + Track 2 chat] W6-W8** (≈8 h): methodology, evaluation text, final pass, page fit, double-blind
+- [x] **29. [You + Track 2 chat] W6-W8** (≈8 h): methodology, evaluation text, final pass, page fit, double-blind
       check. **Submit by 1 Dec AoE.**
 
 ### Writing you can do any time (no Claude Code, with the Track 2 chat)
@@ -254,3 +254,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-15 | W4 Part 1 (in-sample check) | ba25665 | uninformed_submit_before option + test (22 pass); jobs submitted before 2017-11-01 masked for learned predictors: mix-p90/delay 0.956 (w_f 0) / 0.939 (w_f 1) vs 0.945 / 0.941; total 10.5% / 8.5% lower; in-sample jobs = 38% of running jobs, 25% of running GPUs at event starts; stop not fired |
 | 2026-11-15 | W4 Part 2 (fixes) | 936c521 | Sec. 2 [CITE?] resolved (demand response -> liu13; USD/MWh reworded, no claim); Sec. 6 oracle-bursting wording + in-sample sentence; Sec. 5 points to it; ABSTRACT_CLAIMS total-cost note (p90 mix 10%/7%, nocloud 9%/7%) and check; vaswani17 cited in Sec. 4; claims 9/9 |
 | 2026-11-15 | W4 Part 3 (Sections 1, 7, 8) | 85a8bcb | intro with 4 contributions, related work in 5 topic groups (all 24 bib entries now cited), discussion/limitations/conclusion; build 9 pages, 0 overfull, 0 [CITE?], claims 9/9 |
+| 2026-11-15 | 29 (W8 final pass) | pending | gbdt/lightgbm p90 mix on 84 events (mix/delay 0.839/0.847 and 0.870/0.848 vs transformer 0.945/0.941); 6.E reworded; burst ratios as medians; F3/F4 captions; Table II one cap curve; bib venues fixed; abstract_easychair.txt (199 words); build 9 pages, 0 overfull, 0 undefined, 0 [CITE?]; claims 9/9; zip ready |

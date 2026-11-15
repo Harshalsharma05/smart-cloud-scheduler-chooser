@@ -22,7 +22,7 @@ ROWS = [
     ("Host power per GPU, extra if busy", "power", "h_busy_w", "W", "g"),
     ("On-prem PUE", "power", "pue", "--", "g"),
     ("Cloud PUE", "power", "cloud_pue", "--", "g"),
-    ("Cap curve (r, speed), optimistic", "cap_curve", "optimistic", "--", "curve"),
+    ("Cap curve (r, speed)", "cap_curve", "optimistic", "--", "curve"),
     ("Cap curve (r, speed), pessimistic", "cap_curve", "pessimistic", "--", "curve"),
     ("Cap levels (x max power)", None, "cap_levels", "--", "list"),
     ("Cloud price", "cloud", "price_per_gpu_h", "USD per GPU-h", "g"),
@@ -44,7 +44,7 @@ ROWS = [
     ("Job GPU utilisation (until measured)", "philly", "util_default", "--", "g"),
 ]
 
-PAPER_ROWS = ['GPU idle power', 'GPU max power', 'Host power per GPU, idle', 'Host power per GPU, extra if busy', 'On-prem PUE', 'Cap curve (r, speed), optimistic', 'Cap curve (r, speed), pessimistic', 'Cap levels (x max power)', 'Cloud price', 'Cloud boot delay', 'Migration overhead', 'Resume overhead', 'Cloud GPU limit', 'Missed-deadline multiplier']
+PAPER_ROWS = ['GPU idle power', 'GPU max power', 'Host power per GPU, idle', 'Host power per GPU, extra if busy', 'On-prem PUE', 'Cap curve (r, speed)', 'Cap levels (x max power)', 'Cloud price', 'Cloud boot delay', 'Migration overhead', 'Resume overhead', 'Cloud GPU limit', 'Missed-deadline multiplier']
 
 # Short source names for rows that have a verified source (everything else must be an ASSUMPTION or a design choice).
 SHORT = {
