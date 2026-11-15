@@ -62,3 +62,22 @@ def load_runs(exp="e1"):
     if "base_mean_kw" in df:
         df["shed_pct"] = 100.0 * df["shed_mwh"] / (df["cut"] * df["base_mean_kw"] * df["duration_h"] / 1000.0)
     return df
+
+
+# ---- double-blind: no tool names or URLs in figure metadata (every figure script imports this module) ----
+import matplotlib.figure as _mfig  # noqa: E402
+
+_orig_savefig = _mfig.Figure.savefig
+
+
+def _savefig_blind(self, fname, *args, **kw):
+    meta = dict(kw.pop("metadata", None) or {})
+    suffix = str(fname).lower().rsplit(".", 1)[-1]
+    if suffix == "pdf":
+        meta.update(Creator=None, Producer=None, Author=None, Title=None)
+    elif suffix == "png":
+        meta.update(Software=None)
+    return _orig_savefig(self, fname, *args, metadata=meta, **kw)
+
+
+_mfig.Figure.savefig = _savefig_blind

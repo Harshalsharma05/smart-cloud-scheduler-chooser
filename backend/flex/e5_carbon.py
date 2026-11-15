@@ -114,49 +114,25 @@ def table(cfg):
     s = s.merge(dc.reset_index(), on=["policy", "region"])
     s.to_csv(OUT / "e5_carbon.csv", index=False)
     print(s.to_string())
-    write_tex(s, ci)
-    write_macros(s, d)
+    write_tex(d, ci)
 
 
-def write_tex(s, ci):
+def write_tex(d, ci):
+    """T6: cloud emissions as % of avoided emissions, pooled over the feasible events (sum added / sum avoided)."""
     names = dict(POLICIES)
-    lines = ["% T6 (S15). Event-window emissions only (no energy postponed past the event). Entries: median over the 84 feasible E1 events of",
-             "% net kg CO2 per MWh shed = local avoided (eGRID CAMX average) - added by cloud GPUs (eGRID subregion average of the AWS region); share of events with net > 0 in brackets.",
-             r"\begin{tabular}{lrrr}", r"\toprule",
+    pooled = {k: 100.0 * g["added_kg"].sum() / g["avoided_kg"].sum() for k, g in d.groupby(["policy", "region"])}
+    lines = [r"\begin{table}[t]", r"\centering",
+             r"\caption{Cloud emissions as a percentage of the emissions avoided on site, pooled over the " + str(d.event_id.nunique())
+             + r" feasible events. Event window only; eGRID2023 annual average rates, average not marginal.}",
+             r"\label{tab:carbon}", r"\begin{tabular}{lrrr}", r"\toprule",
              r"Policy & us-west-2 & us-east-1 & us-east-2 \\",
              rf" & ({ci['cloud_us_west_2']:.0f} g/kWh) & ({ci['cloud_us_east_1']:.0f} g/kWh) & ({ci['cloud_us_east_2']:.0f} g/kWh) \\", r"\midrule"]
     for p, _ in POLICIES:
-        cells = []
-        for r in REGIONS:
-            x = s[(s.policy == p) & (s.region == r)].iloc[0]
-            cells.append(f"{x.median_net_kg_per_mwh:.1f} ({100 * x.share_net_positive:.0f}\\%)")
-        lines.append(f"{names[p]} & " + " & ".join(cells) + r" \\")
-    lines += [r"\bottomrule", r"\end{tabular}"]
+        lines.append(f"{names[p]} & " + " & ".join(f"{pooled[(p, r)]:.1f}" + r"\%" for r in REGIONS) + r" \\")
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
     (ROOT / "paper" / "tables" / "t6_carbon.tex").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("wrote paper/tables/t6_carbon.tex")
 
-
-def write_macros(s, d):
-    """Macros for the paragraph (prefix \\Ecarbon), appended once: previous \\Ecarbon lines are replaced."""
-    path = ROOT / "paper" / "numbers.tex"
-    keep = [l for l in path.read_text(encoding="utf-8").splitlines() if "\\Ecarbon" not in l and "% E5 carbon" not in l]
-    new = ["% E5 carbon (S15), written by backend/flex/e5_carbon.py from results/e5/e5_carbon.csv"]
-    cap = dict(delay="Delay", mix="Mix", nocloud="Nocloud", oracle="Oracle")
-    rg = dict(us_west_2="West", us_east_1="EastOne", us_east_2="EastTwo")
-    for _, x in s.iterrows():
-        new.append(rf"\newcommand{{\Ecarbon{cap[x.policy]}{rg[x.region]}Net}}{{{x.median_net_kg_per_mwh:.1f}}}")
-        new.append(rf"\newcommand{{\Ecarbon{cap[x.policy]}{rg[x.region]}Share}}{{{100 * x.share_net_positive:.0f}}}")
-    for pol, nm in (("mix", "Mix"), ("oracle", "Oracle")):          # pooled added / avoided emissions, highest-intensity region
-        q = d[(d.policy == pol) & (d.region == "us_east_2")]
-        new.append(rf"\newcommand{{\Ecarbon{nm}AddedPct}}{{{100 * q.added_kg.sum() / q.avoided_kg.sum():.2f}}}")
-    new.append(rf"\newcommand{{\EcarbonLocal}}{{{load_config()['carbon']['local_camx']:.0f}}}")
-    new.append(rf"\newcommand{{\EcarbonEvents}}{{{d.event_id.nunique()}}}")
-    mix = d[d.policy == "mix"]
-    new.append(rf"\newcommand{{\EcarbonMixBurstEventsPct}}{{{100 * (mix.drop_duplicates('event_id').cloud_kwh_window > 0).mean():.0f}}}")
-    orc = d[d.policy == "oracle"]
-    new.append(rf"\newcommand{{\EcarbonOracleBurstEventsPct}}{{{100 * (orc.drop_duplicates('event_id').cloud_kwh_window > 0).mean():.0f}}}")
-    path.write_text("\n".join(keep + new) + "\n", encoding="utf-8")
-    print("wrote macros to paper/numbers.tex")
 
 
 def main():

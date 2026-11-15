@@ -1,13 +1,16 @@
-% T6 (S15). Event-window emissions only (no energy postponed past the event). Entries: median over the 84 feasible E1 events of
-% net kg CO2 per MWh shed = local avoided (eGRID CAMX average) - added by cloud GPUs (eGRID subregion average of the AWS region); share of events with net > 0 in brackets.
+\begin{table}[t]
+\centering
+\caption{Cloud emissions as a percentage of the emissions avoided on site, pooled over the 84 feasible events. Event window only; eGRID2023 annual average rates, average not marginal.}
+\label{tab:carbon}
 \begin{tabular}{lrrr}
 \toprule
 Policy & us-west-2 & us-east-1 & us-east-2 \\
  & (286 g/kWh) & (268 g/kWh) & (413 g/kWh) \\
 \midrule
-delay (transformer) & 198.1 (100\%) & 198.1 (100\%) & 198.1 (100\%) \\
-mix (transformer, p90) & 198.1 (100\%) & 198.1 (100\%) & 198.1 (100\%) \\
-mix-nocloud (transformer, p90) & 198.1 (100\%) & 198.1 (100\%) & 198.1 (100\%) \\
-mix (oracle) & 197.4 (100\%) & 197.4 (100\%) & 197.1 (100\%) \\
+delay (transformer) & 0.0\% & 0.0\% & 0.0\% \\
+mix (transformer, p90) & 0.1\% & 0.1\% & 0.1\% \\
+mix-nocloud (transformer, p90) & 0.0\% & 0.0\% & 0.0\% \\
+mix (oracle) & 2.2\% & 2.1\% & 3.2\% \\
 \bottomrule
 \end{tabular}
+\end{table}

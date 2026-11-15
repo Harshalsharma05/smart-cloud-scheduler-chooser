@@ -119,7 +119,7 @@ does not depend on them.
 ### Block H: finish the paper (~8-10 h)
 
 - [x] **28a. [T2] S16a hold_beyond_grid default; E1/E4 re-run (last2, transformer, oracle); F1/F6/F8/F9/T2/T3 redone; attribution control** (brought forward part of 28).
-- [ ] **28. [T2] S16 Final numbers and figures** (2 h): E1/E3 re-run with the transformer as the realistic predictor;
+- [x] **28. [T2] S16 Final numbers and figures** (2 h): E1/E3 re-run with the transformer as the realistic predictor;
       `paper/numbers.tex`.
 - [ ] **29. [You + Track 2 chat] W6-W8** (≈8 h): methodology, evaluation text, final pass, page fit, double-blind
       check. **Submit by 1 Dec AoE.**
@@ -244,3 +244,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-14 | 21 (T4) | e12119d | test pinball: gbdt 0.419, lightgbm 0.426, transformer 0.442, last2 1.034; AUROC Failed ~0.80 for all learned; status log-loss lightgbm 0.678 vs prior 0.888; oracle perfect; 6 tests pass |
 | 2026-11-14 | 22 (T5) | 487709e | gbdt/lightgbm/transformer.csv over export keys (111,451 rows each); 5 checker OKs; test metrics from CSVs match evaluate (max diff 2.5e-8) |
 | 2026-11-15 | 26 (S15) | 296fcaa | E5 carbon: eGRID2023 intensities in flex.yaml; re-ran mix(transformer p90) and mix(oracle) on 90 E1 events (shed reproduced exactly), 84 feasible; median net kg CO2/MWh shed 198.1 (delay, nocloud, mix-p90), 197.1-197.4 (oracle mix); net > 0 in 100% of events; cloud adds 0.14% (transformer) / 3.2% (oracle) of avoided at us-east-2; t6_carbon.tex, e5_snippet.tex |
+| 2026-11-15 | 28 (S16) | pending | make_numbers.py (211 macros from results only), make_all.py (no re-simulation; F1/F2 need --with-sim), check_claims.py (8 of 9 claims OK; claims-file value 0.85 for oracle 4 h/30% is 0.845 now), check_paper.py (0 unresolved refs/cites, 2 [CITE?], 1 comment-only blind hit), T6 now % cloud emissions of avoided (mix 0.1%, oracle 2.1-3.2%), figure metadata scrubbed |
