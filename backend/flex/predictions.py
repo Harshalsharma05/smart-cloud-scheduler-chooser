@@ -4,7 +4,8 @@ Contract: columns job_id, elapsed_s, rt_p10_s, rt_p50_s, rt_p90_s, p_fail, p_can
 (seconds) at elapsed_s, one row per elapsed grid point while the job runs.
 Lookup: take the latest row with elapsed_s <= elapsed, subtract the gap (elapsed - elapsed_s) from rt_*, floor at 60 s.
 Option lookup_rule="hold_beyond_grid" (S14c, SIM_PLAN): beyond 43,200 s return the last row unchanged (not for the oracle).
-Jobs with no rows fall back to oracle values from the job itself (and are counted).
+Jobs with no rows fall back to oracle values from the job itself (and are counted). Option missing_pred="uninformed" (W7
+robustness): such jobs get 30-day remaining-runtime quantiles and p_fail = p_cancel = 0 instead (never for the oracle).
 """
 import bisect
 import logging
@@ -18,6 +19,8 @@ COLUMNS = ["job_id", "elapsed_s", "rt_p10_s", "rt_p50_s", "rt_p90_s", "p_fail", 
 FLOOR_S = 60
 GRID_MAX_S = 43200                  # last elapsed grid point of the contract
 LOOKUP_RULES = ("contract", "hold_beyond_grid")
+MISSING_PRED = ("oracle", "uninformed")
+UNINFORMED_RT_S = 30 * 86400        # W7: "long and useful", so a job without rows is never burst as about to finish
 
 
 def oracle_values(job, elapsed):
@@ -32,12 +35,15 @@ class Predictions:
         self.name, self.rows = name, rows
         self.fallback_jobs = set()
         self.lookup_rule = "contract"       # S14c: "hold_beyond_grid" = last row unchanged past 43,200 s (never for the oracle)
+        self.missing_pred = "oracle"        # W7: "uninformed" = fixed long, useful values for jobs without rows (never for the oracle)
 
     def lookup(self, job, elapsed):
         """(p10, p50, p90, p_fail, p_cancel) for `job` at `elapsed` seconds of progress."""
         entry = self.rows.get(job.job_id)
         if entry is None:
             self.fallback_jobs.add(job.job_id)
+            if self.missing_pred == "uninformed" and self.name != "oracle":
+                return UNINFORMED_RT_S, UNINFORMED_RT_S, UNINFORMED_RT_S, 0.0, 0.0
             return oracle_values(job, elapsed)
         grid, vals = entry
         if self.lookup_rule == "hold_beyond_grid" and elapsed > GRID_MAX_S and self.name != "oracle":

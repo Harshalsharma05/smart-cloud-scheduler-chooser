@@ -344,3 +344,17 @@ def test_oracle_mix_never_bursts_a_job_that_will_fail():
             n_burst += len(insts)
             assert all(pol.engine.jobs[i.job_id].status == "Pass" for i in insts)
     assert n_burst > 0                                           # the check is not vacuous
+
+
+def test_missing_prediction_fallback_default_is_oracle():
+    """W7: a job without rows uses its oracle values by default; missing_pred="uninformed" gives long, useful values
+    (except for the oracle predictor itself)."""
+    job = FJob("X", "u", 0, 1, 5000, "Failed")
+    pr = Predictions("transformer", {})
+    assert pr.missing_pred == "oracle"
+    assert pr.lookup(job, 1000) == oracle_values(job, 1000)
+    pr.missing_pred = "uninformed"
+    assert pr.lookup(job, 1000) == (30 * 86400, 30 * 86400, 30 * 86400, 0.0, 0.0)
+    orc = Predictions("oracle", {})
+    orc.missing_pred = "uninformed"
+    assert orc.lookup(job, 1000) == oracle_values(job, 1000)

@@ -108,6 +108,9 @@ def compute():
             put(f"Def{nm}Usd{k}", med.loc[who, col], "int")
     put("DefCapSharePct", med.loc["cap", "shed_pct"], "int")
     put("DefCapCompliance", med.loc["cap", "compliance"], "f2")
+    capc = e1[e1.who == "cap"].groupby(["duration_h", "cut"])["compliance"].median()
+    put("CapNoncompliantCells", int((capc < 0.99).sum()), "int")
+    put("CellsTotal", len(capc), "int")
     for dur in (1, 2, 4):
         put(f"CapShareDur{camel({1: 'one', 2: 'two', 4: 'four'}[dur])}Pct", in_cell(e1[e1.who == "cap"], dur, 0.2)["shed_pct"].median(), "int")
 
@@ -167,6 +170,41 @@ def compute():
             put(f"ContractOverHold{nm}{k}", r, "int")
     put("ContractOverHoldMin", min(rat), "int")
     put("ContractOverHoldMax", max(rat), "int")
+
+    # ---- W7 (Section 6): default-cell mix-p90 vs delay, clean-jobs (oos) run, burst at 30% cuts, contract-rule burst picks
+    dly = dc[dc.who == "delay"].set_index("event_id")
+    mp9 = dc[dc.who == "mix-p90"].set_index("event_id")
+    o = pd.read_csv(RESULTS / "e3" / "runs_oos_hold.csv", dtype={"setting": str, "predictor": str, "selector": str}).fillna("")
+    o = o[(o.policy == "mix") & (o.predictor == "transformer") & (o.setting.str.contains("cq=p90"))].set_index("event_id")
+    for k, col in W.items():
+        put(f"DefMixPNineOverDelay{k}", ratio_stats(mp9[col], dly[col])[0], "f2")
+        put(f"OosMixPNineOverDelay{k}", ratio_stats(o[col], dly[col])[0], "f2")     # burst only jobs submitted in the test window
+    b30 = e1[(e1.who == "burst") & (e1["cut"].sub(0.3).abs() < 1e-9)]
+    put("BurstThirtyEvents", len(b30), "int")
+    put("BurstThirtyCompliantEvents", int((b30["compliance"] >= 0.99).sum()), "int")
+    cap3 = pd.read_csv(RESULTS / "s12b" / "burst_cap3000.csv")
+    c3 = cap3[cap3["cap"] == 3000]
+    put("DiagCapThreeKEvents", len(c3), "int")
+    put("DiagCapThreeKCompliantEvents", int((c3["compliance"] >= 0.99).sum()), "int")
+    put("DiagCapThreeKCloudKusdMin", c3["cloud_usd"].min() / 1000, "int")
+    put("DiagCapThreeKCloudKusdMax", c3["cloud_usd"].max() / 1000, "int")
+    sb = pd.read_csv(RESULTS / "s14b" / "tables.csv")
+    bu, run = sb[sb["set"] == "burst"], sb[sb["set"] == "all running"]
+    put("ContractBurstFloorMinPct", 100 * bu["floor60"].min(), "int")
+    put("ContractBurstFloorMaxPct", 100 * bu["floor60"].max(), "int")
+    put("ContractRunningFloorMinPct", 100 * run["floor60"].min(), "int")
+    put("ContractRunningFloorMaxPct", 100 * run["floor60"].max(), "int")
+    put("ContractBurstActualRemMinH", bu["actual_rem_med_h"].min(), "int")
+    put("ContractBurstActualRemMaxH", bu["actual_rem_med_h"].max(), "int")
+    rm = pd.read_csv(RESULTS / "robust_missing" / "summary.csv")
+    for fb, fn in (("oracle", "Oracle"), ("uninformed", "Uninf")):
+        for k, wn in (("Zero", "wfail0"), ("One", "wfail1")):
+            for pol, pn in (("mix", "Mix"), ("nocloud", "Nocloud")):
+                r = rm[(rm.fallback == fb) & (rm.wfail == wn) & (rm.policy == pol)].iloc[0]
+                put(f"Robust{fn}{pn}OverDelay{k}", r.median_ratio, "f3")
+                put(f"Robust{fn}{pn}Cheaper{k}", r.cheaper, "int")
+                put(f"Robust{fn}{pn}Total{k}", r.total_ratio, "f2")
+                put(f"Robust{fn}{pn}ReductionPct{k}", 100 * (1 - r.total_ratio), "int")
 
     # ---- predictor accuracy (test split)
     pm_ = pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv", dtype={"elapsed_s": str})

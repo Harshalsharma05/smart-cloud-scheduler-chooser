@@ -75,6 +75,7 @@ def load_predictors(cfg, data):
     found = {n: load_predictions(pdir / f"{n}.csv") for n in ALL_PREDICTORS if (pdir / f"{n}.csv").exists()}
     for pr in found.values():
         pr.lookup_rule = cfg.get("lookup_rule", "contract")
+        pr.missing_pred = cfg.get("missing_pred", "oracle")
     missing = [n for n in ALL_PREDICTORS if n not in found]
     if missing:
         print("prediction files not found (not run):", ", ".join(missing))
@@ -279,6 +280,21 @@ def e1nc(cfg, jobs, pool, events, predictors, predictor, quick):
     return run_events(cfg, jobs, pool, world, events, per_event, "e1nc")
 
 
+def robust_missing(cfg, jobs, pool, events, predictors, predictor, quick):
+    """W7 robustness: delay, mix (p90) and mix-nocloud (p90) with the transformer, all E1 events, under the setting
+    cfg["missing_pred"] (run with --missing-pred uninformed). Compared against the stored E1 / E1nc rows (oracle fallback)."""
+    world = world_from_config(cfg, predictors["transformer"])
+    tag = "missing=" + cfg.get("missing_pred", "oracle")
+
+    def per_event(snap, ev, base):
+        p90 = dataclasses.replace(world, cost_quantile="p90")
+        return [timed_row(cfg, "robust_missing", snap, ev, "delay", world, base, "transformer", setting=tag, pool=pool),
+                timed_row(cfg, "robust_missing", snap, ev, "mix", p90, base, "transformer", setting=tag + ";cq=p90", pool=pool),
+                timed_row(cfg, "robust_missing", snap, ev, "mix", nocloud_world(world, predictors["transformer"], "p90"), base, "transformer",
+                          setting=tag + ";nocloud;cq=p90", pool=pool)]
+    return run_events(cfg, jobs, pool, world, events, per_event, "robust_missing")
+
+
 def e2nc(cfg, jobs, pool, events, predictors, predictor, quick):
     """S13d (2): mix-nocloud (transformer p90, oracle) on the default cell for ONE pool (--pool) and prices 0.43 and 3.06."""
     world = world_from_config(cfg, predictors[predictor])
@@ -403,7 +419,7 @@ def baseline_waits(cfg, jobs, pool, out_dir, label):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m flex.experiments")
-    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4"])
+    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "robust_missing", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4"])
     ap.add_argument("--data", choices=["synthetic", "philly"], required=True)
     ap.add_argument("--predictor", default="last2")
     ap.add_argument("--quick", action="store_true", help="3 events per cell (and smaller sweeps)")
@@ -415,9 +431,12 @@ def main(argv=None):
     ap.add_argument("--cut", type=float, default=None, help="e1: only events with this cut, for split runs")
     ap.add_argument("--lookup-rule", default=None, choices=["contract", "hold_beyond_grid"], help="e3: S14c prediction lookup rule beyond the last grid point")
     ap.add_argument("--part", default="default", choices=list(E3_PARTS), help="e3: default | hard | oos")
+    ap.add_argument("--missing-pred", default=None, choices=["oracle", "uninformed"], help="W7: fallback for jobs without prediction rows")
     ap.add_argument("--tag", default="", help="suffix of the runs file for split runs (runs_<tag>.csv)")
     args = ap.parse_args(argv)
     cfg = load_config()
+    if args.missing_pred:
+        cfg["missing_pred"] = args.missing_pred
     out_dir = Path(args.out) if args.out else ROOT / cfg["paths"]["results"]
     if args.exp == "e5":
         raise SystemExit("e5 (carbon) is phase S15")
@@ -441,7 +460,7 @@ def main(argv=None):
         auto = d["pool_gpus"]
         cfg["philly"]["pool_gpus"] = {"installed": d["installed_gpus"], "auto": "auto"}.get(args.pool, None) or int(round(float(args.pool) * auto))
     cfg, jobs, pool, events = load_setup(cfg, args.data, args.quick)
-    if args.exp in ("e1", "e1nc") and (args.duration is not None or args.cut is not None):
+    if args.exp in ("e1", "e1nc", "robust_missing") and (args.duration is not None or args.cut is not None):
         events = [e for e in events if (args.duration is None or e.duration_h == args.duration) and (args.cut is None or abs(e.cut - args.cut) < 1e-9)]
     predictors = load_predictors(cfg, args.data)
     if args.predictor not in predictors:
@@ -462,7 +481,7 @@ def main(argv=None):
         rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)
     else:
         extra = dict(prices=[float(x) for x in args.prices.split("|")]) if (args.exp == "e2" and args.prices) else {}
-        rows = {"e1": e1, "e1nc": e1nc, "e2": e2, "e2b": e2b, "e2nc": e2nc}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
+        rows = {"e1": e1, "e1nc": e1nc, "robust_missing": robust_missing, "e2": e2, "e2b": e2b, "e2nc": e2nc}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
     if args.tag:                                          # split runs: one file per piece, merged by the analysis script
         out = Path(out_dir) / args.exp
         out.mkdir(parents=True, exist_ok=True)
