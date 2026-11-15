@@ -1,7 +1,7 @@
 """Build paper/overleaf_upload.zip with only what Overleaf needs to compile main.tex (main.tex at the zip root).
 
 Contents: main.tex, local class/style files (*.cls, *.bst, *.sty in paper/, if any), refs.bib, numbers.tex, sections/*.tex,
-tables/*.tex, figures/*.tex, and the figures/out/*.pdf files that some \\includegraphics actually uses. No scripts, results,
+tables/*.tex, the figures/*.tex that main.tex inputs, and the figures/out/*.pdf files that some \\includegraphics actually uses. No scripts, results,
 logs, PNGs or caches. Then it follows every \\input / \\include / \\includegraphics / \\bibliography reached from main.tex and
 prints the paths that are missing from the zip (the list must be empty).   python paper/make_overleaf_zip.py
 """
@@ -54,8 +54,9 @@ def main():
     need, graphics = references()
     files = ["main.tex", "refs.bib", "numbers.tex"]
     files += sorted(p.name for ext in ("*.cls", "*.bst", "*.sty") for p in P.glob(ext))
-    for d in ("sections", "tables", "figures"):
+    for d in ("sections", "tables"):
         files += sorted(f"{d}/{p.name}" for p in (P / d).glob("*.tex"))
+    files += sorted(f for f in need if f.startswith("figures/") and f.endswith(".tex"))   # only TikZ figures the paper inputs (F4 dropped)
     files += sorted(g for g in graphics if (P / g).exists())
     files = list(dict.fromkeys(files))
     with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:

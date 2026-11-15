@@ -25,7 +25,10 @@ P_{\text{gpu}}(u_j,f)=\min\bigl(P_{\text{idle}}+u_j(P_{\max}-P_{\text{idle}}),\;
 \end{equation}
 where $P_{\text{idle}}$ is the idle GPU power. With $N_b$ busy and $N_i=G-N_b$ idle on-premise GPUs, the facility power is
 \begin{equation}
-P(t)=\text{PUE}\Bigl[\sum_{j\in\text{running}} g_j\,P_{\text{gpu}}(u_j,f)+N_i P_{\text{idle}}+G\,H_{\text{idle}}+N_b H_{\text{busy}}\Bigr],
+\begin{split}
+P(t)=\text{PUE}\Bigl[&\sum_{j\in\text{running}} g_j\,P_{\text{gpu}}(u_j,f)+N_i P_{\text{idle}}\\
+&+G\,H_{\text{idle}}+N_b H_{\text{busy}}\Bigr],
+\end{split}
 \end{equation}
 with the power usage effectiveness PUE, a host power $H_{\text{idle}}$ per installed GPU, and an extra host power $H_{\text{busy}}$ per busy GPU. The cap does not change host power. Power is constant between simulator events, so energies are exact.
 Even with every job removed, the cluster draws the idle floor $P_{\text{floor}}=\text{PUE}\cdot G\,(P_{\text{idle}}+H_{\text{idle}})$. An event with $P^\star<P_{\text{floor}}$ cannot be met by any policy; we call it \emph{infeasible} and exclude it from all results.
@@ -39,7 +42,10 @@ At the event start the cluster may use three actions on running jobs; all other 
 \subsection{Cost of an event}
 Let $T_j$ and $T_j^0$ be the finish time of job $j$ under the policy and in the baseline, and $\delta_j=\max(0,T_j-T_j^0)/3600$ its delay in hours. Delay from suspension, capping, gating and cloud boot is measured the same way. With $c_d$ the cost of a delayed GPU-hour, the cost of a policy is
 \begin{equation}
-C=C_{\text{cloud}}+c_d\!\!\sum_{j\in\text{Pass}}\! g_j\delta_j+w_f c_d\!\!\sum_{j\in\text{Fail/Kill}}\! g_j\delta_j+m\,c_d\!\!\sum_{j\in\mathcal M}\! g_j\,\tfrac{w_j}{3600},
+\begin{split}
+C=C_{\text{cloud}}&+c_d\!\!\sum_{j\in\text{Pass}}\! g_j\delta_j+w_f c_d\!\!\sum_{j\in\text{Fail/Kill}}\! g_j\delta_j\\
+&+m\,c_d\!\!\sum_{j\in\mathcal M}\! g_j\,\tfrac{w_j}{3600},
+\end{split}
 \end{equation}
 where $C_{\text{cloud}}$ is the cloud bill, $w_f$ is the weight of delay on jobs that fail or are killed, and $\mathcal M$ is the set of jobs with a deadline that they meet in the baseline and miss under the policy, each charged $m$ re-runs. We set $c_d$ equal to the cloud price $\pi$, so that an hour of delay is worth an hour of rented GPU. Delaying work that will fail or be cancelled loses no useful output, so the primary setting is $w_f=0$ (cloud money spent on such jobs is always counted); we also report $w_f=1$. The headline metric is
 \begin{equation}

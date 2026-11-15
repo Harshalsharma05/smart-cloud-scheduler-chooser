@@ -1,5 +1,10 @@
 % Burst to Flex (CCGrid 2027). Double-blind: no names, affiliations, repo links or PDF metadata.
 \documentclass[conference]{IEEEtran}
+\usepackage{iftex}
+\ifXeTeX   % local Tectonic build only (paper/build.py): Times metrics as in pdflatex; Overleaf (pdflatex) skips this
+  \usepackage{fontspec}
+  \setmainfont{texgyretermes}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold, ItalicFont=*-italic, BoldItalicFont=*-bolditalic]
+\fi
 \usepackage{cite}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}

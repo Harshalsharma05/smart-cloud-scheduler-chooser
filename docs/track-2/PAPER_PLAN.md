@@ -40,7 +40,7 @@ If over length, cut in this order:
 | F1 | Teaser: facility power over one event (baseline, delay, cap, burst, mix) with target P* | e1 runs, one event | S12 | E1 |
 | F2 | Motivation: (a) GPU-h and jobs by status; (b) CDF of runtime by status; (c) one week of baseline power with evening windows | trace + S8 baseline | S10 | — |
 | F3 | System overview: trace → simulator → event → controller ← predictions; actions to cluster and cloud (drawn by hand: draw.io or TikZ) | — | W3 | — |
-| F4 | (a) The controller's greedy loop; (b) the transformer (token = past job, [CUR] token, two heads). Can be one combined figure with F3 | Track 1 plan | W3 | — |
+| F4 | **Dropped (2026-11-15):** a TikZ controller flow (`paper/figures/f4_controller.tex`, kept in the repo, not in the paper or the Overleaf zip) duplicated Algorithm 1 and cost about a third of a column; page budget. The transformer diagram was never drawn. | — | W3 | — |
 | F6 | **Main:** $/MWh vs event length, one panel per cut, lines for delay / cap / burst / mix (median, IQR band); shortfall marked | e1 summary | S12 | E1 |
 | F7 | Winner map: cloud price multiplier (x) × boot delay (y), cell = cheapest policy, annotated with the mix's burst share | e2 summary | S13 | E2 |
 | F8 | Burst selection: $/MWh and cloud $ wasted (stacked: Failed/Killed, short remaining, useful) per selector | e3 summary | S14 | E3 |

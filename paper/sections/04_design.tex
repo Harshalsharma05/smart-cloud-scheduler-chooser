@@ -27,11 +27,13 @@ The three single-action baselines are restrictions of the same machinery: \emph{
 \begin{algorithmic}[1]
 \Require running jobs $\mathcal J$, cap levels $\mathcal F$, target $P^\star$, predictions
 \For{$f\in\mathcal F$}
-  \State $p\leftarrow$ power at $t_s$ under level $f$;~ $\hat C_f\leftarrow\sum_{j}\hat c_{\text{cap}}(j,f)$;~ $\mathcal A_f\leftarrow\emptyset$
+  \State $p\leftarrow$ power at $t_s$ under level $f$
+  \State $\hat C_f\leftarrow\sum_{j}\hat c_{\text{cap}}(j,f)$;~ $\mathcal A_f\leftarrow\emptyset$
   \State $a_j\leftarrow\arg\min\{\hat c_{\text{hold}}(j),\hat c_{\text{burst}}(j)\}$ for every $j$
   \For{$j\in\mathcal J$ in increasing order of $\hat c_{a_j}(j)/\Delta P_j(f)$}
     \If{$p\le P^\star$} \textbf{break} \EndIf
-    \State $p\leftarrow p-\Delta P_j(f)$;~ $\hat C_f\leftarrow\hat C_f+\hat c_{a_j}(j)-\hat c_{\text{cap}}(j,f)$;~ $\mathcal A_f\leftarrow\mathcal A_f\cup\{(j,a_j)\}$
+    \State $p\leftarrow p-\Delta P_j(f)$;~ $\mathcal A_f\leftarrow\mathcal A_f\cup\{(j,a_j)\}$
+    \State $\hat C_f\leftarrow\hat C_f+\hat c_{a_j}(j)-\hat c_{\text{cap}}(j,f)$
   \EndFor
   \State record plan $(f,\mathcal A_f,\hat C_f,\;p\le P^\star)$
 \EndFor
@@ -40,15 +42,13 @@ The three single-action baselines are restrictions of the same machinery: \emph{
 \end{algorithmic}
 \end{algorithm}
 
-Figure~\ref{fig:controller} shows the same plan together with what happens during and after the event.
+After the plan, only admission gating acts until $t_s+D$; then the cap is lifted and suspended jobs resume in submission order.
 
-\input{figures/f4_controller}
-
-\paragraph{Which jobs to burst.}
+\paragraph{Which jobs to burst}
 Setting $q_j=1$ and $c_d=\pi$, bursting is cheaper than holding when $\hat r_j<D-\tau_m-\tau_b$: the job's remaining runtime must be shorter than the event less the overheads. The reason is that the cloud bill covers the whole remaining runtime, while the grid benefits only during the event; a longer job is rented for hours the grid does not value. A job likely to fail adds a second effect: with $w_f=0$ its delay is almost free ($q_j\to 0$), but its cloud bill is real, so the controller holds it. Bursting is therefore cheap only for jobs that are about to finish and are likely to succeed, which is why the controller needs both a remaining-runtime and a failure estimate.
 
 \subsection{Predictor interface}
-Whatever model produces it, a prediction is a file with one row per job and elapsed time $e\in\{0,60,600,3600,14400,43200\}$\,s while the job runs, holding the remaining-runtime quantiles $\hat r^{10},\hat r^{50},\hat r^{90}$ (seconds, floored at one minute) and the probabilities $p^{\text{fail}}$ and $p^{\text{cancel}}$.
+Whatever model produces it, a prediction is a file with one row per job and elapsed time $e\in\{0,\allowbreak 60,\allowbreak 600,\allowbreak 3600,\allowbreak 14400,\allowbreak 43200\}$\,s while the job runs, holding the remaining-runtime quantiles $\hat r^{10},\hat r^{50},\hat r^{90}$ (seconds, floored at one minute) and the probabilities $p^{\text{fail}}$ and $p^{\text{cancel}}$.
 We compare the last-two-jobs average~\cite{tsafrir07}, gradient-boosted trees~\cite{hu21}, the transformer below, and an oracle that reads the true runtime and status (an upper bound).
 The simulator looks up a running job at its elapsed time, which is its progress in nominal seconds (work done, including time run before the simulation started), so the lookup stays correct under caps and suspensions. A job with no prediction row uses its true values; this affects only jobs still running at the end of the trace.
 

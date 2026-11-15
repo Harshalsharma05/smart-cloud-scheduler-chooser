@@ -141,5 +141,5 @@ for f in TEX + [P / "numbers.tex"]:
 print("   hazards:", haz)
 bad += haz > 0
 
-print("\nNOTE: no LaTeX here, so nothing above says the PDF builds.")
+print("\nNOTE: these are text checks only. For a real compile run python paper/build.py (Tectonic/XeTeX; Overleaf uses pdflatex).")
 sys.exit(1 if bad else 0)

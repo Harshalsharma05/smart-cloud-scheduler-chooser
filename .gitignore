@@ -19,3 +19,7 @@ paper/figures/out/
 
 # Overleaf upload bundle (built by paper/make_overleaf_zip.py)
 paper/overleaf_upload.zip
+
+# local LaTeX engine and build output
+tools/
+paper/build/
