@@ -240,6 +240,27 @@ def compute():
             mixp = nl[(nl.policy == "mix") & (nl.predictor == p_) & (nl.setting == "cq=p90")].set_index("event_id")[W[k]]
             put(f"Learned{nm_}MixOverTransDelay{k}", ratio_stats(mixp, dly_all[W[k]])[0], "f2")
 
+    # W8b: three learned predictors x {main, masked}: mix-p90 / delay-only, mix-p90 / mix-nocloud-p90, events cheaper, total
+    la = pd.read_csv(RESULTS / "e1_learned_nc" / "summary.csv")
+    pn_ = {"transformer": "Trans", "gbdt": "Gbdt", "lightgbm": "Lightgbm"}
+    for r in la.itertuples():
+        base = f"Set{pn_[r.predictor]}{r.variant.capitalize()}"
+        for k, wn in (("Zero", "wfail0"), ("One", "wfail1")):
+            put(f"{base}MixOverDelay{k}", getattr(r, f"mix_delay_{wn}"), "f3")
+            put(f"{base}MixOverNocloud{k}", getattr(r, f"mix_nocloud_{wn}"), "f2")
+            put(f"{base}Cheaper{k}", getattr(r, f"cheaper_{wn}"), "int")
+            put(f"{base}ReductionPct{k}", 100 * (1 - getattr(r, f"total_{wn}")), "int")
+    main_ = la[la.variant == "main"]
+    ratios = pd.concat([main_.mix_delay_wfail0, main_.mix_delay_wfail1])
+    put("LearnedGainMinPct", 100 * (1 - ratios.max()), "int")       # per-event median gain of the p90 mix over delay-only
+    put("LearnedGainMaxPct", 100 * (1 - ratios.min()), "int")
+    ncr = pd.concat([la.mix_nocloud_wfail0, la.mix_nocloud_wfail1])
+    put("LearnedMixOverNocloudMin", ncr.min(), "f2")
+    put("LearnedMixOverNocloudMax", ncr.max(), "f2")
+    shift = max(abs(la[(la.predictor == p) & (la.variant == "masked")][c].iloc[0] - la[(la.predictor == p) & (la.variant == "main")][c].iloc[0])
+                for p in pn_ for c in ("mix_delay_wfail0", "mix_delay_wfail1"))
+    put("LearnedMaskShiftMax", shift, "f2")
+
     # ---- predictor accuracy (test split)
     pm_ = pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv", dtype={"elapsed_s": str})
     allr = pm_[pm_["elapsed_s"] == "all"].set_index("predictor")

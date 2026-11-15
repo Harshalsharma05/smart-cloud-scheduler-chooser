@@ -26,6 +26,7 @@ STEPS = [                                   # (label, command, cwd)
     ("W7 missing-prediction robustness (csv)", [PY, str(FIG / "make_robust_missing.py")], ROOT),
     ("W4 in-sample leakage check (csv)", [PY, str(FIG / "make_robust_insample.py")], ROOT),
     ("W8 gbdt / lightgbm p90 mix (csv)", [PY, str(FIG / "make_learned.py")], ROOT),
+    ("W8b three learned predictors x masking (csv)", [PY, str(FIG / "make_learned_all.py")], ROOT),
     ("W7 main table (t_main)", [PY, str(FIG / "make_t_main.py")], ROOT),
     ("T6 carbon table", [PY, "-m", "flex.e5_carbon", "table"], ROOT / "backend"),
 ]

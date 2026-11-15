@@ -315,6 +315,27 @@ def e1_learned(cfg, jobs, pool, events, predictors, predictor, quick):
     return run_events(cfg, jobs, pool, world, events, per_event, "e1_learned")
 
 
+def e1_learned_nc(cfg, jobs, pool, events, predictors, predictor, quick):
+    """W8b: gbdt and lightgbm on all E1 events. Without a mask: mix-nocloud p90 only (delay and mix p90 are in e1_learned).
+    With --uninformed-before: delay-only, mix p90 and mix-nocloud p90 (in-sample masking)."""
+    world = world_from_config(cfg, predictors["transformer"])
+    masked = bool(cfg.get("uninformed_submit_before"))
+    tag = f"uninformed<{cfg['uninformed_submit_before']}" if masked else ""
+
+    def per_event(snap, ev, base):
+        rows = []
+        for p in ("gbdt", "lightgbm"):
+            w = dataclasses.replace(world, predictor=predictors[p])
+            if masked:
+                rows.append(timed_row(cfg, "e1_learned_nc", snap, ev, "delay", w, base, p, setting=tag, pool=pool))
+                rows.append(timed_row(cfg, "e1_learned_nc", snap, ev, "mix", dataclasses.replace(w, cost_quantile="p90"), base, p,
+                                      setting=";".join(x for x in (tag, "cq=p90") if x), pool=pool))
+            rows.append(timed_row(cfg, "e1_learned_nc", snap, ev, "mix", nocloud_world(world, predictors[p], "p90"), base, p,
+                                  setting=";".join(x for x in (tag, "nocloud", "cq=p90") if x), pool=pool))
+        return rows
+    return run_events(cfg, jobs, pool, world, events, per_event, "e1_learned_nc")
+
+
 def e2nc(cfg, jobs, pool, events, predictors, predictor, quick):
     """S13d (2): mix-nocloud (transformer p90, oracle) on the default cell for ONE pool (--pool) and prices 0.43 and 3.06."""
     world = world_from_config(cfg, predictors[predictor])
@@ -439,7 +460,7 @@ def baseline_waits(cfg, jobs, pool, out_dir, label):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m flex.experiments")
-    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4"])
+    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4"])
     ap.add_argument("--data", choices=["synthetic", "philly"], required=True)
     ap.add_argument("--predictor", default="last2")
     ap.add_argument("--quick", action="store_true", help="3 events per cell (and smaller sweeps)")
@@ -483,7 +504,7 @@ def main(argv=None):
         auto = d["pool_gpus"]
         cfg["philly"]["pool_gpus"] = {"installed": d["installed_gpus"], "auto": "auto"}.get(args.pool, None) or int(round(float(args.pool) * auto))
     cfg, jobs, pool, events = load_setup(cfg, args.data, args.quick)
-    if args.exp in ("e1", "e1nc", "robust_missing", "robust_insample", "e1_learned") and (args.duration is not None or args.cut is not None):
+    if args.exp in ("e1", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc") and (args.duration is not None or args.cut is not None):
         events = [e for e in events if (args.duration is None or e.duration_h == args.duration) and (args.cut is None or abs(e.cut - args.cut) < 1e-9)]
     predictors = load_predictors(cfg, args.data)
     if args.predictor not in predictors:
@@ -504,7 +525,7 @@ def main(argv=None):
         rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)
     else:
         extra = dict(prices=[float(x) for x in args.prices.split("|")]) if (args.exp == "e2" and args.prices) else {}
-        rows = {"e1": e1, "e1nc": e1nc, "robust_missing": robust_missing, "robust_insample": robust_missing, "e1_learned": e1_learned, "e2": e2, "e2b": e2b, "e2nc": e2nc}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
+        rows = {"e1": e1, "e1nc": e1nc, "robust_missing": robust_missing, "robust_insample": robust_missing, "e1_learned": e1_learned, "e1_learned_nc": e1_learned_nc, "e2": e2, "e2b": e2b, "e2nc": e2nc}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
     if args.tag:                                          # split runs: one file per piece, merged by the analysis script
         out = Path(out_dir) / args.exp
         out.mkdir(parents=True, exist_ok=True)
