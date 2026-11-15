@@ -2,7 +2,9 @@
 % W2: written from SIM_PLAN D10-D11, backend/flex/policies.py, flex/predictions.py and ml/model.py. No result numbers except the marked \RESULT.
 \section{Design}
 \label{sec:design}
-This section describes the controller that chooses the actions of Section~\ref{sec:problem}, the predictions it reads, and the model that produces them. Symbols are those of Section~\ref{sec:problem}.
+This section describes the controller that chooses the actions of Section~\ref{sec:problem}, the predictions it reads, and the model that produces them. Symbols are those of Section~\ref{sec:problem}. Figure~\ref{fig:overview} shows how the parts connect.
+
+\input{figures/f3_overview}
 
 \subsection{Controller}
 The controller plans once at the event start $t_s$ and then relies on admission gating: power can only fall as jobs end, so holding back new starts that would exceed $P^\star$ keeps the cluster under the target for the rest of the event.
@@ -37,6 +39,10 @@ The three single-action baselines are restrictions of the same machinery: \emph{
 \State set the cap to $f$; suspend or burst each job in $\mathcal A_f$ (a refused burst becomes a suspend)
 \end{algorithmic}
 \end{algorithm}
+
+Figure~\ref{fig:controller} shows the same plan together with what happens during and after the event.
+
+\input{figures/f4_controller}
 
 \paragraph{Which jobs to burst.}
 Setting $q_j=1$ and $c_d=\pi$, bursting is cheaper than holding when $\hat r_j<D-\tau_m-\tau_b$: the job's remaining runtime must be shorter than the event less the overheads. The reason is that the cloud bill covers the whole remaining runtime, while the grid benefits only during the event; a longer job is rented for hours the grid does not value. A job likely to fail adds a second effect: with $w_f=0$ its delay is almost free ($q_j\to 0$), but its cloud bill is real, so the controller holds it. Bursting is therefore cheap only for jobs that are about to finish and are likely to succeed, which is why the controller needs both a remaining-runtime and a failure estimate.

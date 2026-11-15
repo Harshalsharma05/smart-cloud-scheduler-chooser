@@ -1,0 +1,40 @@
+% F4 (W3): decision flow of the mix controller at an event, single column. Follows Algorithm 1 and Section 4 (greedy plan per cap level,
+% admission gating during the event, resume at the end). TikZ libraries: positioning, arrows.meta, shapes.geometric, fit, calc.
+% NOT compiled locally (no LaTeX installed); checked by reading only.
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  font=\footnotesize, >=Stealth, node distance=3.5mm,
+  step/.style={draw, align=center, text width=5.4cm, inner sep=3pt},
+  term/.style={step, rounded corners=6pt},
+  side/.style={draw, align=center, text width=2.2cm, inner sep=3pt},
+  dec/.style={draw, diamond, aspect=3, align=center, inner sep=1pt},
+  flow/.style={->, thick}]
+  \node[term] (ev) {Grid event $(t_s,D,\kappa)$ arrives};
+  \node[step, below=of ev] (tgt) {Target $P^\star=(1-\kappa)\bar P_0$; for every running job $j$ read $\hat r_j$ and $q_j=1-p^{\text{fail}}_j-p^{\text{cancel}}_j$};
+  \node[step, below=7mm of tgt] (pick) {Each job takes its cheaper action:\\$a_j=\arg\min\{\hat c_{\text{hold}}(j),\hat c_{\text{burst}}(j)\}$};
+  \node[step, below=of pick] (greedy) {Apply jobs in increasing $\hat c_{a_j}(j)/\kappa_j(f)$ until power $\le P^\star$};
+  \node[step, below=of greedy] (rec) {Record plan: cost $\hat C_f$, reaches $P^\star$ or not};
+  \node[draw, dashed, inner sep=6pt, fit=(pick)(greedy)(rec)] (loop) {};
+  \node[rotate=90, anchor=south, inner sep=2pt] at (loop.west) {for each cap level $f\in\mathcal F$};
+  \draw[flow] (rec.east) -- ++(0.6,0) |- node[pos=0.25, right] {next $f$} (pick.east);
+  \node[dec, below=6mm of loop] (any) {a plan reaches $P^\star$?};
+  \node[side] (yes) at ($(any.south)+(-2.4,-1.1)$) {cheapest such plan (milder $f$ on ties)};
+  \node[side] (no) at ($(any.south)+(2.4,-1.1)$) {cheapest plan overall (shortfall)};
+  \node[step, anchor=north] (act) at ($(yes.south -| any.south)+(0,-4mm)$) {Set cap level $f$; suspend or burst each job in the plan (a burst refused at the cloud limit $C_{\max}$ becomes a suspend)};
+  \node[step, below=of act] (gate) {During the event the admission gate holds new jobs that would exceed $P^\star$; a held job is burst if its cloud estimate is below its hold estimate};
+  \node[term, below=of gate] (end) {At $t_s+D$: lift the cap, resume suspended jobs in submission order};
+  % flow
+  \draw[flow] (ev) -- (tgt);
+  \draw[flow] (tgt) -- (pick);
+  \draw[flow] (rec) -- (any);
+  \draw[flow] (any.west) -| node[pos=0.25, above] {yes} (yes.north);
+  \draw[flow] (any.east) -| node[pos=0.25, above] {no} (no.north);
+  \draw[flow] (yes.south) -- (yes.south |- act.north);
+  \draw[flow] (no.south) -- (no.south |- act.north);
+  \draw[flow] (act) -- (gate);
+  \draw[flow] (gate) -- (end);
+\end{tikzpicture}
+\caption{Decision flow of the mix controller at an event (Algorithm~\ref{alg:mix}). The plan is made once at $t_s$; afterwards only admission gating acts. Every cost estimate uses predictions only.}
+\label{fig:controller}
+\end{figure}

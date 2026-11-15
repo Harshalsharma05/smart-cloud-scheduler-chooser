@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 P = ROOT / "paper"
-TEX = sorted(list((P / "sections").glob("*.tex")) + list((P / "tables").glob("*.tex")) + [P / "main.tex"])
+TEX = sorted(list((P / "sections").glob("*.tex")) + list((P / "tables").glob("*.tex")) + list((P / "figures").glob("*.tex")) + [P / "main.tex"])
 TEXT = TEX + [P / "refs.bib", P / "abstract.txt", P / "numbers.tex"]
 BS = chr(92)
 bad = 0
@@ -61,7 +61,7 @@ print("   total:", n_mark)
 
 # 3. double blind
 print("\n== 3. double-blind scan")
-PAT = re.compile(r"harshal|sharma|unaccomplished|pdeu|pandit|universit|college|github|gitlab|bitbucket|[\w.+-]+@[\w-]+\.[\w.]+|[A-Za-z]:" + re.escape(BS) + r"|/home/|/Users/|\bAdmin\b|smart-scheduler|minor project", re.I)
+PAT = re.compile(r"harshal|sharma|unaccomplished|pdeu|pandit|universit|college|github|gitlab|bitbucket|[\w.+-]+@[\w-]+\.[\w.]+|\b[A-Za-z]:" + re.escape(BS) + r"[A-Za-z]|/home/|/Users/|\bAdmin\b|smart-scheduler|minor project", re.I)
 hits = 0
 for f in TEXT:
     for i, l in enumerate(lines(f), 1):
