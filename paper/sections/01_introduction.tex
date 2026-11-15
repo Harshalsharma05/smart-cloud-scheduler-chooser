@@ -1,4 +1,15 @@
-% Page budget: 1.0 page. Grid stress at evening peaks; GPU clusters as flexible load; three levers; why bursting is under-studied; why which jobs needs prediction; 4 contribution bullets; F1 teaser.
+% Page budget: 0.8 page (W4). Claims match the abstract and Section 6; every result number is a macro.
 \section{Introduction}
 \label{sec:intro}
-Placeholder paragraph for the introduction.
+Electric grids increasingly ask large consumers to cut their load for a few hours when demand peaks~\cite{liu13}. GPU clusters for machine learning are growing into such large loads. A cluster that can shed load on request helps the grid, but only if it knows what each way of shedding costs.
+
+A GPU cluster has three ways to cut power during an event. It can delay jobs, cap the power of its GPUs, or burst running jobs to a public cloud. Data-center demand response has been studied~\cite{liu13,zhou24}, but offloading to the cloud as a priced response to a grid request is understudied. Its key difficulty is that the cloud bill covers a burst job's whole remaining runtime, while the grid values only the hours of the event. Bursting therefore pays off only for jobs that will end soon and succeed, so the cluster needs predictions of the remaining runtime and the failure risk of the jobs running at the event.
+
+We study this choice with a trace-driven simulation of the Microsoft Philly GPU cluster~\cite{jeon19}. Grid events last 1 to 4 hours and ask for cuts of 10 to 30\%. We price every action in dollars per MWh shed, and we build a controller that mixes the three actions and chooses jobs using predictions from a small transformer over each user's job history. Our contributions are:
+\begin{itemize}
+\item A cost model that prices delay, power capping and cloud bursting in dollars per MWh shed on one scale (Section~\ref{sec:problem}).
+\item A mix controller that plans over cap levels and job actions, and a predictor interface that any runtime and failure model can fill (Section~\ref{sec:design}).
+\item Findings on the Philly trace (Section~\ref{sec:eval}). Delay is the cheapest single action, at \$\DefDelayUsdZero{} to \$\DefDelayUsdOne{} per MWh for a 2-hour, 20\% cut. In that cell, capping alone sheds \DefCapSharePct\% of the target, and bursting alone costs \BurstOverDelayDefaultOne{} to \BurstOverDelayDefaultZero{} times more. The mix with the transformer's 90th-percentile runtime estimate is about 5\% cheaper than delay alone (per-event median ratio \MixPNineOverDelayZero{} and \MixPNineOverDelayOne{} for the two cost weightings); this gain comes from capping and job selection, not from offloading. Bursting helped only with the oracle's exact runtimes, in long events with deep cuts.
+\item A pitfall: reading runtime predictions naively for long-running jobs makes the controller \ContractOverHoldMin{} to \ContractOverHoldMax{} times more expensive (Section~\ref{sec:eval}).
+\end{itemize}
+Code and configurations will be released after review.

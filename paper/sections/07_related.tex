@@ -1,4 +1,13 @@
-% Page budget: 0.7 page. Hybrid-cloud bursting; data-center demand response; carbon-aware computing; GPU power; runtime prediction; GPU traces.
+% Page budget: 0.5 page (W4). Grouped by topic; each paper is described only at the level of its title and venue (or what Sections 2-4 already say).
 \section{Related Work}
 \label{sec:related}
-Placeholder paragraph for related work.
+
+\emph{Data-center demand response.} Liu et al.\ study how a data center can avoid the coincident peak by shifting workload and using local generation~\cite{liu13}. Zhou et al.\ compare the primary-response potential of GPU and CPU data centers~\cite{zhou24}. These works ask whether and how much a data center can respond. We ask what each response action costs per MWh shed, and we include renting cloud capacity as one of the actions.
+
+\emph{Carbon-aware computing.} Other work uses the same flexibility to lower emissions: carbon-aware computing for data centers~\cite{radovanovic23}, temporal shifting of cloud workloads~\cite{wiesner21}, cloud workload elasticity for carbon efficiency~\cite{hanafy24}, and a framework for designing carbon-aware data centers~\cite{acun23}. These works optimise emissions. We price a grid request in dollars and treat carbon only as a side check.
+
+\emph{Hybrid-cloud bursting and cost-aware scheduling.} Sending work to rented capacity has a long history: the cost-benefit of extending clusters with cloud resources~\cite{assuncao09}, time- and cost-sensitive data-intensive computing on hybrid clouds~\cite{bicer12}, a cost model for bursting iterative MapReduce jobs~\cite{clemente17}, and cost-aware schedulers for hybrid and public clouds~\cite{luo24,chung18,chang25}. These works study the cost of cloud capacity for cluster workloads. They do not treat bursting as a priced response to a grid request, in which only the hours of the event have value.
+
+\emph{GPU power and energy.} Zeus studies the energy of deep-learning training on GPUs~\cite{you23}, and Patel et al.\ characterise power-management opportunities for large language models in the cloud~\cite{patel24}. We use them for the GPU idle power and to anchor the cap curve. Our cap is a cluster-wide level held for the length of an event.
+
+\emph{Runtime and failure prediction.} User runtime estimates in backfilling schedulers were studied early~\cite{mualem01}, and predictions generated from a user's recent jobs can replace them~\cite{tsafrir07}. Workload studies of large GPU clusters~\cite{jeon19,weng22} describe the jobs such predictors face, and learned predictors for GPU clusters use features of the job and of the user's history~\cite{hu21,hu23}. We use predictions to choose which jobs to delay, cap or burst. In our runs, how a prediction is read for long-running jobs changed the cost far more than the accuracy differences between the learned predictors (Section~\ref{sec:eval}).
