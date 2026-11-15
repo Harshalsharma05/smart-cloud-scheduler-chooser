@@ -213,6 +213,19 @@ def compute():
         if len(q):
             put(f"Ethree{nm_}MixUsdEvent", q["cost_usd"].median(), "int")
 
+    # W4 leakage check: jobs submitted before TRAIN_END get uninformed values from the learned predictors
+    ri = pd.read_csv(RESULTS / "robust_insample" / "summary.csv")
+    for k, wn in (("Zero", "wfail0"), ("One", "wfail1")):
+        for pol, pn in (("mix", "Mix"), ("nocloud", "Nocloud")):
+            r = ri[(ri.variant == "insample_uninformed") & (ri.wfail == wn) & (ri.policy == pol)].iloc[0]
+            put(f"Insample{pn}OverDelay{k}", r.median_ratio, "f3")
+            put(f"Insample{pn}Cheaper{k}", r.cheaper, "int")
+            put(f"Insample{pn}ReductionPct{k}", 100 * (1 - r.total_ratio), "int")
+        r = ri[(ri.variant == "insample_over_main") & (ri.wfail == wn)].iloc[0]
+        put(f"InsampleDelayOverMain{k}", r.median_ratio, "f2")
+    put("InsampleRunningJobsPct", ri[ri.policy == "running_jobs_pct_median"].median_ratio.iloc[0], "int")
+    put("InsampleRunningGpusPct", ri[ri.policy == "running_gpus_pct_median"].median_ratio.iloc[0], "int")
+
     # ---- predictor accuracy (test split)
     pm_ = pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv", dtype={"elapsed_s": str})
     allr = pm_[pm_["elapsed_s"] == "all"].set_index("predictor")

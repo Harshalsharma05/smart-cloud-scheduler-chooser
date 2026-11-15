@@ -36,9 +36,14 @@ class Predictions:
         self.fallback_jobs = set()
         self.lookup_rule = "contract"       # S14c: "hold_beyond_grid" = last row unchanged past 43,200 s (never for the oracle)
         self.missing_pred = "oracle"        # W7: "uninformed" = fixed long, useful values for jobs without rows (never for the oracle)
+        self.uninformed_before_s = None     # W4 leakage check: jobs whose real submit time (simulated s) is earlier get uninformed values
 
     def lookup(self, job, elapsed):
         """(p10, p50, p90, p_fail, p_cancel) for `job` at `elapsed` seconds of progress."""
+        if self.uninformed_before_s is not None and self.name != "oracle":
+            submit = job.submit if job.submit_real is None else job.submit_real
+            if submit < self.uninformed_before_s:
+                return UNINFORMED_RT_S, UNINFORMED_RT_S, UNINFORMED_RT_S, 0.0, 0.0
         entry = self.rows.get(job.job_id)
         if entry is None:
             self.fallback_jobs.add(job.job_id)

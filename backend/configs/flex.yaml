@@ -9,6 +9,7 @@ paths:                  # relative to the repo root
 seed: 1                 # ASSUMPTION: default seed for synthetic runs
 lookup_rule: hold_beyond_grid   # ASSUMPTION (decision 2026-11-14, SIM_PLAN S16a): contract | hold_beyond_grid; non-oracle predictions beyond the last grid point (43,200 s) are held at the last row instead of the gap being subtracted (S14b/S14c)
 missing_pred: oracle       # ASSUMPTION (W7 robustness): oracle | uninformed; jobs without prediction rows use their true values (oracle) or 30-day remaining runtime with p_fail = p_cancel = 0 (uninformed); never changes the oracle predictor
+uninformed_submit_before: null   # ASSUMPTION (W4 leakage check): null | date; non-oracle predictors return the uninformed values (30 d, p_fail = p_cancel = 0) for jobs submitted before this date
 check_every: 1000       # ASSUMPTION: full safety check every N events on large runs (tests use 1)
 
 synthetic:              # synthetic test data only, never used for paper numbers

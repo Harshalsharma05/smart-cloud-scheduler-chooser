@@ -24,6 +24,7 @@ STEPS = [                                   # (label, command, cwd)
     ("S14c F8 + T3 (final)", [PY, str(FIG / "make_s14c.py")], ROOT),
     ("S16a E1 tables (csv)", [PY, str(FIG / "make_s16a.py")], ROOT),
     ("W7 missing-prediction robustness (csv)", [PY, str(FIG / "make_robust_missing.py")], ROOT),
+    ("W4 in-sample leakage check (csv)", [PY, str(FIG / "make_robust_insample.py")], ROOT),
     ("W7 main table (t_main)", [PY, str(FIG / "make_t_main.py")], ROOT),
     ("T6 carbon table", [PY, "-m", "flex.e5_carbon", "table"], ROOT / "backend"),
 ]

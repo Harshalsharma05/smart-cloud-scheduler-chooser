@@ -358,3 +358,17 @@ def test_missing_prediction_fallback_default_is_oracle():
     orc = Predictions("oracle", {})
     orc.missing_pred = "uninformed"
     assert orc.lookup(job, 1000) == oracle_values(job, 1000)
+
+
+def test_uninformed_submit_before_default_is_off():
+    """W4: by default no job is masked; with a threshold, earlier-submitted jobs get uninformed values (not for the oracle)."""
+    rows = {"A": ([0], [(500.0, 600.0, 700.0, 0.2, 0.1)])}
+    job = FJob("A", "u", 100, 1, 5000, "Pass")
+    pr = Predictions("transformer", rows)
+    assert pr.uninformed_before_s is None
+    assert pr.lookup(job, 0) == (500.0, 600.0, 700.0, 0.2, 0.1)
+    pr.uninformed_before_s = 200
+    assert pr.lookup(job, 0) == (30 * 86400, 30 * 86400, 30 * 86400, 0.0, 0.0)
+    orc = Predictions("oracle", rows)
+    orc.uninformed_before_s = 200
+    assert orc.lookup(job, 0) == (500.0, 600.0, 700.0, 0.2, 0.1)
