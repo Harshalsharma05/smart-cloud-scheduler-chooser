@@ -13,7 +13,7 @@
   \node[term] (ev) {Grid event $(t_s,D,\kappa)$ arrives};
   \node[step, below=of ev] (tgt) {Target $P^\star=(1-\kappa)\bar P_0$; for every running job $j$ read $\hat r_j$ and $q_j=1-p^{\text{fail}}_j-p^{\text{cancel}}_j$};
   \node[step, below=7mm of tgt] (pick) {Each job takes its cheaper action:\\$a_j=\arg\min\{\hat c_{\text{hold}}(j),\hat c_{\text{burst}}(j)\}$};
-  \node[step, below=of pick] (greedy) {Apply jobs in increasing $\hat c_{a_j}(j)/\kappa_j(f)$ until power $\le P^\star$};
+  \node[step, below=of pick] (greedy) {Apply jobs in increasing $\hat c_{a_j}(j)/\Delta P_j(f)$ until power $\le P^\star$};
   \node[step, below=of greedy] (rec) {Record plan: cost $\hat C_f$, reaches $P^\star$ or not};
   \node[draw, dashed, inner sep=6pt, fit=(pick)(greedy)(rec)] (loop) {};
   \node[rotate=90, anchor=south, inner sep=2pt] at (loop.west) {for each cap level $f\in\mathcal F$};

@@ -15,11 +15,11 @@ For every running job $j$ it reads from a predictor the remaining runtime $\hat 
 \hat c_{\text{cap}}(j,f)&=c_d\,g_j\tfrac{D}{3600}\bigl(1-s_j(f)\bigr)\,q_j .
 \end{align}
 Holding (suspending) a job delays its useful work for the event length; $\hat c_{\text{ddl}}(j)$ adds the cost of a missed deadline if the job would meet its deadline when left alone but miss it when held. Bursting pays the cloud bill for the whole remaining runtime plus the boot wait. Capping slows the job by $1-s_j(f)$. Each estimate uses only predictions, never the job's true runtime or status.
-The power a job action saves is $\kappa_j(f)=\text{PUE}\,g_j\bigl(P_{\text{gpu}}(u_j,f)-P_{\text{idle}}+H_{\text{busy}}\bigr)$ when the cluster runs at cap level $f$.
+The power a job action saves is $\Delta P_j(f)=\text{PUE}\,g_j\bigl(P_{\text{gpu}}(u_j,f)-P_{\text{idle}}+H_{\text{busy}}\bigr)$ when the cluster runs at cap level $f$.
 
 Algorithm~\ref{alg:mix} is a greedy plan over cap levels. For each level it lets every job take its cheaper action and applies jobs in order of cost per kilowatt saved, until the target is reached; the cap's own slowdown cost is replaced by the action cost for each job that is suspended or burst. It then picks the cheapest plan among those that reach $P^\star$ (the cheapest overall if none does), preferring the milder cap on ties.
 A burst refused because of the cloud limit $C_{\max}$ becomes a suspension. While the event lasts, a job that arrives and is held by the gate is burst if its cloud estimate (without migration) is below its hold estimate for the rest of the event.
-The three single-action baselines are restrictions of the same machinery: \emph{delay-only} suspends by lowest $\hat c_{\text{hold}}/\kappa_j$, \emph{cap-only} uses the mildest level that reaches $P^\star$ (or the deepest, reporting a shortfall), and \emph{burst-only} bursts by lowest $\hat c_{\text{burst}}/\kappa_j$ and bursts every arrival the gate would hold.
+The three single-action baselines are restrictions of the same machinery: \emph{delay-only} suspends by lowest $\hat c_{\text{hold}}/\Delta P_j$, \emph{cap-only} uses the mildest level that reaches $P^\star$ (or the deepest, reporting a shortfall), and \emph{burst-only} bursts by lowest $\hat c_{\text{burst}}/\Delta P_j$ and bursts every arrival the gate would hold.
 
 \begin{algorithm}[t]
 \caption{Mix controller at event start $t_s$}
@@ -29,9 +29,9 @@ The three single-action baselines are restrictions of the same machinery: \emph{
 \For{$f\in\mathcal F$}
   \State $p\leftarrow$ power at $t_s$ under level $f$;~ $\hat C_f\leftarrow\sum_{j}\hat c_{\text{cap}}(j,f)$;~ $\mathcal A_f\leftarrow\emptyset$
   \State $a_j\leftarrow\arg\min\{\hat c_{\text{hold}}(j),\hat c_{\text{burst}}(j)\}$ for every $j$
-  \For{$j\in\mathcal J$ in increasing order of $\hat c_{a_j}(j)/\kappa_j(f)$}
+  \For{$j\in\mathcal J$ in increasing order of $\hat c_{a_j}(j)/\Delta P_j(f)$}
     \If{$p\le P^\star$} \textbf{break} \EndIf
-    \State $p\leftarrow p-\kappa_j(f)$;~ $\hat C_f\leftarrow\hat C_f+\hat c_{a_j}(j)-\hat c_{\text{cap}}(j,f)$;~ $\mathcal A_f\leftarrow\mathcal A_f\cup\{(j,a_j)\}$
+    \State $p\leftarrow p-\Delta P_j(f)$;~ $\hat C_f\leftarrow\hat C_f+\hat c_{a_j}(j)-\hat c_{\text{cap}}(j,f)$;~ $\mathcal A_f\leftarrow\mathcal A_f\cup\{(j,a_j)\}$
   \EndFor
   \State record plan $(f,\mathcal A_f,\hat C_f,\;p\le P^\star)$
 \EndFor

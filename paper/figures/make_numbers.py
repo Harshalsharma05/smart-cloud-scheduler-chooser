@@ -113,7 +113,7 @@ def compute():
     for k, col in W.items():
         pn = nc.pivot_table(index="event_id", columns="who", values=col, aggfunc="first")
         pm = piv(e1, col)
-        pairs = {"TransP90": ("mix-p90", "nc:transformer:p90"), "TransP50": ("mix", "nc:transformer:p50"),
+        pairs = {"TransPNineZero": ("mix-p90", "nc:transformer:p90"), "TransPFiveZero": ("mix", "nc:transformer:p50"),
                  "Oracle": ("mix+oracle", "nc:oracle:p50"), "LastTwo": ("mix (last2)", "nc:last2:p50")}
         for nm, (mw, nw) in pairs.items():
             r, wins, n, _ = ratio_stats(pm[mw], pn[nw])
@@ -195,7 +195,10 @@ def main():
     B = chr(92)
     lines = ["% Written by paper/figures/make_numbers.py from saved results only. Do not edit by hand; never type a result here."]
     for name, (v, kind) in M.items():
-        lines.append(f"{B}newcommand{{{B}{name}}}{{{fmt(v, kind)}}}")
+        val = fmt(v, kind)
+        assert re.fullmatch(r"[A-Za-z]+", name), f"macro name must be letters only (LaTeX): {name}"
+        assert not re.search(r"(?<!\\)[#%&_$]", val), f"unescaped special character in value of {name}: {val}"
+        lines.append(f"{B}newcommand{{{B}{name}}}{{{val}}}")
     (ROOT / "paper" / "numbers.tex").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("wrote paper/numbers.tex:", len(M), "macros")
     return M

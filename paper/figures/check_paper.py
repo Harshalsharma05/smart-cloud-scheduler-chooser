@@ -32,8 +32,12 @@ def cmd(name_pat):
     return re.escape(BS) + name_pat + r"\{([^}]+)\}"
 
 
-# 1. macros
-defined = set(re.findall(cmd(r"newcommand").replace(r"\{([^}]+)\}", r"\{" + re.escape(BS) + r"([A-Za-z]+)\}"), (P / "numbers.tex").read_text(encoding="utf-8")))
+# 1. macros (every name defined in numbers.tex must be letters only, or LaTeX stops at it)
+all_names = re.findall(re.escape(BS) + r"newcommand\{" + re.escape(BS) + r"([^}]*)\}", (P / "numbers.tex").read_text(encoding="utf-8"))
+bad_names = [n for n in all_names if not re.fullmatch(r"[A-Za-z]+", n)]
+print("== 0. macro names in numbers.tex that are not letters only:", bad_names or "none")
+bad += bool(bad_names)
+defined = set(n for n in all_names if re.fullmatch(r"[A-Za-z]+", n))
 prefixes = {re.match(r"[A-Z][a-z]+", n).group(0) for n in defined if re.match(r"[A-Z][a-z]+", n)}
 used = Counter()
 for f in TEX:
@@ -104,5 +108,38 @@ print("   cite keys missing in refs.bib:", sorted(set(cites) - bib) or "none")
 print("   uncited bib entries:", sorted(bib - set(cites)) or "none")
 print(f"   labels {len(labels)}, refs {len(refs)}, cite keys {len(cites)}, bib entries {len(bib)}")
 bad += bool(set(refs) - labels) + bool(set(cites) - bib)
+# 5. usual first-compile errors with pdflatex (heuristics on the files Overleaf compiles)
+print("\n== 5. pdflatex hazards (main.tex, sections, tables, figures/*.tex, numbers.tex)")
+E = re.escape(BS)
+UNESC = r"(?<!" + E + r")(?:" + E + E + r")*"     # a character is escaped only after an odd number of backslashes
+MATH_ENVS = r"(?:align\*?|equation\*?|tabular|algorithmic|tikzpicture)"
+haz = 0
+for f in TEX + [P / "numbers.tex"]:
+    raw = f.read_text(encoding="utf-8")
+    rel = f.relative_to(ROOT).as_posix()
+    for i, l in enumerate(raw.splitlines(), 1):
+        code = re.sub(r"(?<!" + E + r")%.*", "", l)
+        for ch in sorted(set(c for c in code if ord(c) > 127)):
+            haz += 1
+            print(f"   {rel}:{i}: non-ASCII {ch!r} (U+{ord(ch):04X})")
+        if re.search(r"[0-9]%", l):
+            haz += 1
+            print(f"   {rel}:{i}: unescaped % after a number (comments out the rest of the line): {l.strip()[:90]}")
+    s = strip_comments(raw)
+    if len(re.findall(UNESC + r"\$", s)) % 2:
+        haz += 1
+        print(f"   {rel}: odd number of unescaped $ (a $ meant as dollar sign?)")
+    # text outside math, verbatim-like arguments and tabular/align bodies
+    t = re.sub(E + r"begin\{" + MATH_ENVS + r"\}.*?" + E + r"end\{" + MATH_ENVS + r"\}", " ", s, flags=re.S)
+    t = re.sub(UNESC + r"\$.*?" + UNESC + r"\$", " ", t, flags=re.S)
+    t = re.sub(E + r"(?:label|ref|cite[a-z]*|input|includegraphics|url|usepackage|usetikzlibrary|documentclass|newcommand|providecommand)(?:\[[^\]]*\])?\{[^}]*\}", " ", t)
+    for ch, what in (("_", "underscore"), ("&", "ampersand"), ("#", "hash")):
+        for m in re.finditer(UNESC + re.escape(ch) + (r"(?![0-9])" if ch == "#" else ""), t):
+            haz += 1
+            ctx = t[max(0, m.start() - 40): m.end() + 30].replace("\n", " ")
+            print(f"   {rel}: unescaped {what} outside math: ...{ctx}...")
+print("   hazards:", haz)
+bad += haz > 0
+
 print("\nNOTE: no LaTeX here, so nothing above says the PDF builds.")
 sys.exit(1 if bad else 0)

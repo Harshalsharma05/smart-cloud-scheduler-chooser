@@ -16,3 +16,6 @@ runs/
 ml/.venv/
 ml/results/*.parquet
 paper/figures/out/
+
+# Overleaf upload bundle (built by paper/make_overleaf_zip.py)
+paper/overleaf_upload.zip
