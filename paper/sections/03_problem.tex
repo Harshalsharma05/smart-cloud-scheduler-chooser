@@ -49,7 +49,7 @@ C=C_{\text{cloud}}&+c_d\!\!\sum_{j\in\text{Pass}}\! g_j\delta_j+w_f c_d\!\!\sum_
 \end{equation}
 where $C_{\text{cloud}}$ is the cloud bill, $w_f$ is the weight of delay on jobs that fail or are killed, and $\mathcal M$ is the set of jobs with a deadline that they meet in the baseline and miss under the policy, each charged $m$ re-runs. We set $c_d$ equal to the cloud price $\pi$, so that an hour of delay is worth an hour of rented GPU. Delaying work that will fail or be cancelled loses no useful output, so the primary setting is $w_f=0$ (cloud money spent on such jobs is always counted); we also report $w_f=1$. The headline metric is
 \begin{equation}
-\text{USD/MWh}=C/E_{\text{shed}}\quad\text{if }E_{\text{shed}}\ge 0.1\,\kappa\,\bar P_0 D,
+\text{USD/MWh}=C/E_{\text{shed}}\quad\text{if }E_{\text{shed}}\ge 0.1\,\kappa\,\bar P_0 D,\label{eq:usdmwh}
 \end{equation}
 and undefined otherwise, so a policy that barely sheds does not look cheap. A policy whose compliance is below $99\%$ is never reported as a winner.
 

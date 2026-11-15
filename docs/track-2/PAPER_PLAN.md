@@ -4,7 +4,7 @@ Version 1, 11 Nov 2026. Companion to `SIM_PLAN.md` (phases S0–S16). Figure and
 
 **Fixed:**
 - Abstract by 24 Nov 2026 AoE; full paper by 1 Dec 2026 AoE.
-- 10 pages including references; IEEE conference template (`IEEEtran`, `conference` option); double-blind.
+- 10 pages including references (verified from the CCGrid 2027 call, 2026-11-15); IEEE conference template (`IEEEtran`, `conference` option); double-blind.
 
 **Check on the submission site when it opens:**
 - Can the abstract be edited between 24 Nov and 1 Dec? Many systems allow it, but don't assume.
@@ -17,15 +17,23 @@ Version 1, 11 Nov 2026. Companion to `SIM_PLAN.md` (phases S0–S16). Figure and
 | § | Section | Pages | Content | Can write before results? |
 |---|---|---|---|---|
 | — | Title, abstract | 0.3 | ≤ 200 words | Skeleton yes, numbers no |
-| 1 | Introduction | 1.0 | Grid stress at evening peaks; GPU clusters as flexible load; three levers; why bursting is under-studied as a grid action; why "which jobs" needs prediction; contributions (4 bullets); F1 teaser | Yes (all but F1 and the headline numbers) |
+| 1 | Introduction | 0.9 | Grid stress at evening peaks; GPU clusters as flexible load; three levers; why bursting is under-studied as a grid action; why "which jobs" needs prediction; contributions (4 bullets); F1 teaser | Yes (all but F1 and the headline numbers) |
 | 2 | Background and motivation | 1.0 | Demand response and $/MWh; Philly facts: many jobs fail or are killed, failed jobs die early, power has a daily shape → F2 | Text yes; F2 needs S10 |
 | 3 | Problem formulation | 1.0 | Event (t_s, D, cut); target P*; power model (D5); actions and their costs (D7, D8, D9); $/MWh definition; assumptions box (D4, D8, D12) | **Yes, fully** |
 | 4 | Design | 1.4 | Controller: greedy $/kW over cap levels plus job actions (D11); burst selection rule and why remaining runtime about the length of D and low failure risk are the sweet spot; predictor interface; transformer (small figure F4b, content from Track 1) | **Yes, fully** (transformer details from the Track 1 plan) |
-| 5 | Methodology | 0.8 | Trace and test window; simulator (GPU pool, FCFS skip-ahead, paired runs, D6); parameters table T1 with sources; baselines (Tsafrir last-two, GBDT, LightGBM, oracle); events (D13) | Yes, except the final parameter values (S11) |
-| 6 | Evaluation | 2.8 | 6.1 E1 cost of flexibility (F6, T2) · 6.2 E2 when burst wins (F7, T4) · 6.3 E3 does prediction help (F8, T3) · 6.4 E4 user impact (F9) · 6.5 E5 carbon (F10 or one paragraph) | No |
-| 7 | Related work | 0.7 | Hybrid-cloud bursting (de Assunção HPDC'09, Bicer CCGrid'12, Clemente-Castelló CCGrid'17, Stratus SoCC'18, Starburst ATC'24, Eva EuroSys'25); data-center demand response (Liu SIGMETRICS'13, Zhou PESGM'24); carbon-aware computing (Radovanović TPS'23, Wiesner Middleware'21, CarbonScaler SIGMETRICS'24, Carbon Explorer ASPLOS'23); GPU power (Zeus NSDI'23, Patel ASPLOS'24); job-runtime prediction (Tsafrir TPDS'07, Hu SC'21, Lucid ASPLOS'23); GPU traces (Jeon ATC'19, Weng NSDI'22) | **Yes, fully** |
+| 5 | Methodology | 0.6 (+ Table params) | Trace and test window; simulator (GPU pool, FCFS skip-ahead, paired runs, D6); parameters table T1 with sources; baselines (Tsafrir last-two, GBDT, LightGBM, oracle); events (D13) | Yes, except the final parameter values (S11) |
+| 6 | Evaluation | 2.6 | 6.1 E1 cost of flexibility (F6, T2) · 6.2 E2 when burst wins (F7, T4) · 6.3 E3 does prediction help (F8, T3) · 6.4 E4 user impact (F9) · 6.5 E5 carbon (F10 or one paragraph) | No |
+| 7 | Related work | 0.6 | Hybrid-cloud bursting (de Assunção HPDC'09, Bicer CCGrid'12, Clemente-Castelló CCGrid'17, Stratus SoCC'18, Starburst ATC'24, Eva EuroSys'25); data-center demand response (Liu SIGMETRICS'13, Zhou PESGM'24); carbon-aware computing (Radovanović TPS'23, Wiesner Middleware'21, CarbonScaler SIGMETRICS'24, Carbon Explorer ASPLOS'23); GPU power (Zeus NSDI'23, Patel ASPLOS'24); job-runtime prediction (Tsafrir TPDS'07, Hu SC'21, Lucid ASPLOS'23); GPU traces (Jeon ATC'19, Weng NSDI'22) | **Yes, fully** |
 | 8 | Discussion, limitations, conclusion | 0.4 | Threats: simulation only, one trace, merged attempts, GPU model unknown, synthetic deadlines, checkpoint assumption, constant carbon; guidelines ("use cap for shallow short cuts, burst for …"); future work | Threats yes; guidelines no |
 | — | References | 0.6 | About 25–30 entries | Yes |
+
+### Writing rules (all sections, from W6 on)
+
+- Plain, short sentences. One idea per sentence. No hype words (novel, significantly, dramatically, state-of-the-art).
+- Every result number comes from a macro in `numbers.tex` (add it via `paper/figures/make_numbers.py`; letters-only names). Design constants may be literals.
+- Cite only keys in `refs.bib`, and only what the text needs. Do not add a reference without a verified venue. Non-paper sources (AWS price, Uptime PUE, Google PUE, eGRID, datasheets) get a footnote with the URL and "accessed <date>", taken from the source comments in `backend/configs/flex.yaml`.
+- Double-blind: no names, university, repo links or "our previous work".
+- No claims the results do not support. Section 6 owns the results; Section 5 only says what was run.
 
 If over length, cut in this order:
 1. Shrink F1 or drop it (use F6 as the teaser).

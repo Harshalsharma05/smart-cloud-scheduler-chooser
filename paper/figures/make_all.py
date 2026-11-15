@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIG = ROOT / "paper" / "figures"
 PY = sys.executable
 STEPS = [                                   # (label, command, cwd)
+    ("Section 5 setup stats (trace loader, no simulation)", [PY, str(FIG / "methodology_stats.py")], ROOT),
     ("T1 parameters", [PY, str(FIG / "params_table.py")], ROOT),
     ("T2 default cell + F6", [PY, str(FIG / "make_t2.py")], ROOT),
     ("F6 E1 lines (w_fail 0)", [PY, str(FIG / "fig_e1.py")], ROOT),

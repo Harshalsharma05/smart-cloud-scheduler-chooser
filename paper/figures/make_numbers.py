@@ -78,6 +78,24 @@ def compute():
     put("SetupEventsTotal", n_ev, "int")
     put("SetupEventsInfeasible", n_inf, "int")
     put("SetupEventsFeasible", n_ev - n_inf, "int")
+    inf_cuts = sorted(raw[raw["feasible"].astype(str) == "False"]["cut"].unique())
+    assert len(inf_cuts) == 1, f"infeasible events at several cuts: {inf_cuts}"   # the text says "all at one cut"
+    put("SetupInfeasibleCutPct", 100 * inf_cuts[0], "int")
+    cov = raw[(raw["predictor"] == "transformer") & (raw["feasible"].astype(str) != "False")]["pred_coverage"].dropna()
+    put("MethNoPredGpuShareMedianPct", 100 * (1 - cov.median()), "int")       # running GPUs at an event start without a prediction row
+
+    # ---- Section 5 setup numbers (methodology_stats.py: trace loader, no simulation) and the baseline check (S9c validation.csv)
+    for r in pd.read_csv(RESULTS / "methodology" / "stats.csv", dtype={"value": str}).itertuples():
+        nm = camel("meth_" + r.name)
+        try:
+            M[nm] = (float(r.value), "int")
+        except ValueError:
+            M[nm] = (r.value, "str")
+    val = pd.read_csv(RESULTS / "philly_baseline" / "validation.csv").set_index("metric")
+    for metric, kind in (("busy_gpus_mean", "int"), ("utilisation_mean", "f2"), ("wait_mean_min", "int"), ("wait_p50_min", "f1"),
+                         ("wait_p90_min", "int"), ("frac_wait_gt_60s", "f2")):
+        put(camel("base_real_" + metric), val.loc[metric, "real"], kind)
+        put(camel("base_sim_" + metric), val.loc[metric, "simulated"], kind)
 
     # ---- E1: default cell medians and ratios (transformer = the realistic predictor)
     e1 = load_runs("e1")
