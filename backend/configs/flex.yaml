@@ -73,3 +73,11 @@ philly:                  # real-trace loader (S8)
   warmup_days: 7         # ASSUMPTION: the simulation starts this many days before TEST_START so the queue and pool are filled by the window start
   util_default: 0.5      # ASSUMPTION: used for every job only when philly_job_util.parquet (S9) is absent; otherwise unmeasured jobs get the measured cluster average
   pool_gpus: auto        # derived: median non-NA GPU count per minute over the test window (cluster_gpu_util, S9c); an integer overrides it (used for the sensitivity). Derived from the trace, not tuned on waits.
+
+carbon:                   # E5 side check: annual AVERAGE CO2 emission rates, g CO2 per kWh (average, not marginal)
+  # All four: US EPA, eGRID2023 Summary Tables (rev1, produced 2025-01-17), Table 1, total CO2 output emission rate. URL: https://www.epa.gov/system/files/documents/2025-01/egrid2023_summary_tables_rev1.pdf , accessed 2026-11-15. lb/MWh x 0.45359 = g/kWh.
+  # Average not marginal; subregion NWPP/SRVC/RFCW is the eGRID subregion that contains the AWS region, a mapping we chose.
+  local_camx: 198.1       # source: eGRID2023 Table 1, CAMX 436.7 lb/MWh; the grid where the events happen (California), accessed 2026-11-15
+  cloud_us_west_2: 286.5  # source: eGRID2023 Table 1, NWPP 631.7 lb/MWh (subregion mapping chosen by us), accessed 2026-11-15
+  cloud_us_east_1: 267.7  # source: eGRID2023 Table 1, SRVC 590.2 lb/MWh (subregion mapping chosen by us), accessed 2026-11-15
+  cloud_us_east_2: 413.4  # source: eGRID2023 Table 1, RFCW 911.3 lb/MWh (subregion mapping chosen by us), accessed 2026-11-15

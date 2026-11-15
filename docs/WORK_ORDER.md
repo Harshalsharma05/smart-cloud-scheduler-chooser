@@ -112,7 +112,7 @@ does not depend on them.
 - [x] **25b. [T2] S13b Diagnostics of the S13 results** (migrate/restore, oracle mechanism, absolute table; measurement only).
 - [x] **25c. [T2] S13c Sweeps and T4 redone under hold_beyond_grid** (contract-rule results kept in results/*_contract).
 - [x] **25d. [T2] S13d Marginal value of bursting (mix-nocloud control)** (measurement only).
-- [ ] **26. [T2] S15 E5 carbon** (1.5 h; **trim**: one paragraph if short of time).
+- [x] **26. [T2] S15 E5 carbon** (1.5 h; **trim**: one paragraph if short of time).
 - [x] **27. [T2] S9 Utilisation join** (3-5 h; **trim**: skip and keep the cluster-average fallback if short of time).
       If done, re-run step 19 quickly so E1 uses real utilisation.
 
@@ -243,3 +243,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-14 | 23 (S10) | 1bf3ebe | F2 (4 panels) + results/motivation/stats.csv (42 numbers, macros \Mot* in numbers.tex) + Section 2 text; Failed+Killed = 59.3% of GPU-hours, 64.3% of them end within 1 h; baseline power flat (evening/overall 0.996); 86.8% of running jobs at the 90 event starts are past the 12 h grid |
 | 2026-11-14 | 21 (T4) | e12119d | test pinball: gbdt 0.419, lightgbm 0.426, transformer 0.442, last2 1.034; AUROC Failed ~0.80 for all learned; status log-loss lightgbm 0.678 vs prior 0.888; oracle perfect; 6 tests pass |
 | 2026-11-14 | 22 (T5) | 487709e | gbdt/lightgbm/transformer.csv over export keys (111,451 rows each); 5 checker OKs; test metrics from CSVs match evaluate (max diff 2.5e-8) |
+| 2026-11-15 | 26 (S15) | pending | E5 carbon: eGRID2023 intensities in flex.yaml; re-ran mix(transformer p90) and mix(oracle) on 90 E1 events (shed reproduced exactly), 84 feasible; median net kg CO2/MWh shed 198.1 (delay, nocloud, mix-p90), 197.1-197.4 (oracle mix); net > 0 in 100% of events; cloud adds 0.14% (transformer) / 3.2% (oracle) of avoided at us-east-2; t6_carbon.tex, e5_snippet.tex |
