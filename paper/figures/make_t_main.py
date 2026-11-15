@@ -19,7 +19,14 @@ def main():
     nc = mn.read_nc()
     nc["who"] = nc.apply(lambda r: f"nocloud{' p90' if 'cq=p90' in r['setting'] else ''} ({r['predictor']})", axis=1)
     nc["shed_pct"] = 100.0 * nc["shed_mwh"] / (nc["cut"] * nc["base_mean_kw"] * nc["duration_h"] / 1000.0)
-    d = pd.concat([e1, nc], ignore_index=True)
+    import glob
+    lr = pd.concat([pd.read_csv(f, dtype={"selector": str, "predictor": str, "setting": str})
+                    for f in sorted(glob.glob(str(ROOT / "results" / "e1_learned" / "runs_*.csv")))
+                    + sorted(glob.glob(str(ROOT / "results" / "e1_learned_nc" / "runs_main_*.csv")))], ignore_index=True).fillna({"setting": ""})
+    lr = lr[lr["feasible"].astype(str) != "False"]
+    lr["who"] = lr.apply(lambda r: {"": "delay", "cq=p90": "mix-p90", "nocloud;cq=p90": "nocloud p90"}[r["setting"]] + f" ({r['predictor']})", axis=1)
+    lr["shed_pct"] = 100.0 * lr["shed_mwh"] / (lr["cut"] * lr["base_mean_kw"] * lr["duration_h"] / 1000.0)
+    d = pd.concat([e1, nc, lr], ignore_index=True)
     rows = [  # (label, who, delay reference)
         (r"\multicolumn{5}{@{}l}{\emph{Transformer predictor}}", None, None),
         ("delay-only", "delay", "delay"),
@@ -28,6 +35,14 @@ def main():
         ("mix, p50 bill", "mix", "delay"),
         ("mix, p90 bill", "mix-p90", "delay"),
         ("mix-nocloud, p90", "nocloud p90 (transformer)", "delay"),
+        (r"\multicolumn{5}{@{}l}{\emph{Gradient-boosted trees}}", None, None),
+        ("delay-only", "delay (gbdt)", "delay (gbdt)"),
+        ("mix, p90 bill", "mix-p90 (gbdt)", "delay (gbdt)"),
+        ("mix-nocloud, p90", "nocloud p90 (gbdt)", "delay (gbdt)"),
+        (r"\multicolumn{5}{@{}l}{\emph{LightGBM}}", None, None),
+        ("delay-only", "delay (lightgbm)", "delay (lightgbm)"),
+        ("mix, p90 bill", "mix-p90 (lightgbm)", "delay (lightgbm)"),
+        ("mix-nocloud, p90", "nocloud p90 (lightgbm)", "delay (lightgbm)"),
         (r"\multicolumn{5}{@{}l}{\emph{Last-two-jobs predictor}}", None, None),
         ("mix", "mix (last2)", "delay (last2)"),
         (r"\multicolumn{5}{@{}l}{\emph{Oracle (upper bound)}}", None, None),

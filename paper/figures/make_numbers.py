@@ -259,7 +259,7 @@ def compute():
     put("LearnedMixOverNocloudMax", ncr.max(), "f2")
     shift = max(abs(la[(la.predictor == p) & (la.variant == "masked")][c].iloc[0] - la[(la.predictor == p) & (la.variant == "main")][c].iloc[0])
                 for p in pn_ for c in ("mix_delay_wfail0", "mix_delay_wfail1"))
-    put("LearnedMaskShiftMax", shift, "f2")
+    put("LearnedMaskShiftMax", shift, "f3")
 
     # ---- predictor accuracy (test split)
     pm_ = pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv", dtype={"elapsed_s": str})
