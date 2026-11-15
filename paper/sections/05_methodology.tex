@@ -39,7 +39,7 @@ Each event is a paired run: the baseline and every policy start from the same sn
 \subsection{Predictors and policies}
 We compare five predictors (Section~\ref{sec:design}): the last-two-jobs average~\cite{tsafrir07}, gradient-boosted trees, LightGBM~\cite{ke17}, the transformer, and the oracle. Each writes rows on the elapsed-time grid.
 \MethNoPredJobs{} simulated jobs, \MethNoPredCarryJobs{} of them carry-over jobs, have no prediction row and use their true values. Because these jobs run long, they hold a median of \MethNoPredGpuShareMedianPct\% of the running GPUs at an event start; Section~\ref{sec:eval} shows that this fallback does not change the results.
-Warm-up and carry-over jobs were submitted in the training or validation period, so their predictions are in-sample for the learned models.
+Warm-up and carry-over jobs were submitted in the training or validation period, so their predictions are in-sample for the learned models; Section~\ref{sec:eval} checks the effect.
 The policies are delay-only, cap-only, burst-only, the mix with the median or the 90th-percentile cloud bill, and mix-nocloud: the same mix with no cloud capacity ($C_{\max}=0$), which separates the effect of bursting from that of capping and job choice. The hold-beyond-grid lookup rule is the default; the contract rule is a robustness check.
 
 \subsection{Parameters and metrics}

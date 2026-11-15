@@ -18,6 +18,8 @@ Default cell = 2 h / 20% (10 events); hold rule = `hold_beyond_grid` (default si
 4. **"about 5% cheaper than delay alone" (claim g)** is the median per-event ratio over 84 feasible events (0.95). In total cost it is 0.91 (w_fail 0)
    and 0.93 (w_fail 1); in the default cell 10 of 10 events are cheaper than delay. The controller is mix-nocloud (the mix with the cloud refused),
    which equals the mix with the p90 estimate to within 1% (mix/mix-nocloud = 1.00).
+   **Total-cost reduction (W4 note):** for the p90 mix it is 10% (w_fail 0, total ratio 0.904) and 7% (w_fail 1, 0.930); the 9% / 7% pair
+   (0.912 / 0.934) is mix-nocloud. Section 6 quotes the p90-mix pair.
 
 ## Claims table
 
