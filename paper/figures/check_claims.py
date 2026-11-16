@@ -50,7 +50,7 @@ def main():
         "a": ([("delay $/MWh w0", 3334, M["DefDelayUsdZero"], 0.5), ("delay $/MWh w1", 12941, M["DefDelayUsdOne"], 0.5),
                ("cells delay<burst", 9, delay_lt_burst, 0), ("cells cap non-compliant", 9, cap_noncompliant, 0)],
               "roughly $3k–13k per MWh", [round(M["DefDelayUsdZero"] / 1000) == 3, round(M["DefDelayUsdOne"] / 1000) == 13]),
-        "b": ([("cap share of target, %", 46, M["DefCapSharePct"], 0.5)], "In that cell, power capping alone reaches less than half of the cut", [M["DefCapSharePct"] < 50]),
+        "b": ([("cap share of target, %", 46, M["DefCapSharePct"], 0.5)], "In that cell, capping alone reaches less than half of the cut", [M["DefCapSharePct"] < 50]),
         "c": ([("per-event median w1", 30, M["BurstOverDelayDefaultOne"], 0.5), ("per-event median w0", 125, M["BurstOverDelayDefaultZero"], 0.5),
                ("ratio of medians cost w1", 33, med[("burst", "cost_usd_wfail1")] / med[("delay", "cost_usd_wfail1")], 0.5),
                ("ratio of medians cost w0", 123, med[("burst", "cost_usd")] / med[("delay", "cost_usd")], 0.5),
@@ -65,7 +65,7 @@ def main():
                ("lightgbm mix-p90/delay w0", 0.870, M["SetLightgbmMainMixOverDelayZero"], 0.0005), ("lightgbm w1", 0.848, M["SetLightgbmMainMixOverDelayOne"], 0.0005),
                ("gbdt cheaper w0", 72, M["SetGbdtMainCheaperZero"], 0), ("lightgbm cheaper w0", 71, M["SetLightgbmMainCheaperZero"], 0),
                ("max masking shift", 0.029, M["LearnedMaskShiftMax"], 0.0005)],
-              "the controller beats delay alone by a median of 5–16% per event under our default cap curve, depending on the learned predictor",
+              "the controller beats delay alone by a median of 5–16% per event when delaying failed or killed jobs costs nothing (w_f=0), under our default cap curve, depending on the learned predictor",
               [round(M["LearnedGainMinPct"]) == 5, round(M["LearnedGainMaxPct"]) == 16, M["LearnedMaskShiftMax"] <= 0.03]),
         "d'": ([("p50 mix/delay w0", 1.012, M["MixOverDelayZero"], 0.0005), ("p50 cheaper w0", 35, M["MixOverDelayCheaperZero"], 0),
                 ("p50 mix/delay w1", 0.976, M["MixOverDelayOne"], 0.0005), ("p50 cheaper w1", 54, M["MixOverDelayCheaperOne"], 0)], None, []),
@@ -87,7 +87,7 @@ def main():
                ("default cell w1", 0.87, M["NocloudOverDelayDefaultOne"], 0.005), ("default cell cheaper events", 10, default_cheaper, 0),
                ("total cost w0", 0.91, M["NocloudOverDelayTotalZero"], 0.005), ("total cost w1", 0.93, M["NocloudOverDelayTotalOne"], 0.005)],
               None, []),                       # removed from the abstract in W8b; values kept as a reference check
-        "h": ([], "We discuss when offloading is worth using", []),
+        "h": ([], "We discuss when offloading pays off", []),
     }
     rows = parse_claims()
     out, bad = [], 0

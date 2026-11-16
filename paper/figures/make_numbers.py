@@ -251,7 +251,7 @@ def compute():
             put(f"{base}Cheaper{k}", getattr(r, f"cheaper_{wn}"), "int")
             put(f"{base}ReductionPct{k}", 100 * (1 - getattr(r, f"total_{wn}")), "f1")
     main_ = la[la.variant == "main"]
-    ratios = pd.concat([main_.mix_delay_wfail0, main_.mix_delay_wfail1])
+    ratios = main_.mix_delay_wfail0                     # W9b: the gain claim is scoped to w_f = 0
     put("LearnedGainMinPct", 100 * (1 - ratios.max()), "int")       # per-event median gain of the p90 mix over delay-only
     put("LearnedGainMaxPct", 100 * (1 - ratios.min()), "int")
     ncr = pd.concat([la.mix_nocloud_wfail0, la.mix_nocloud_wfail1])
