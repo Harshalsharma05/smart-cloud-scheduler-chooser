@@ -372,3 +372,18 @@ def test_uninformed_submit_before_default_is_off():
     orc = Predictions("oracle", rows)
     orc.uninformed_before_s = 200
     assert orc.lookup(job, 0) == (500.0, 600.0, 700.0, 0.2, 0.1)
+
+
+def test_plan_wf_default_is_zero_and_match_reweights_q():
+    """W9b: by default the plan uses q_j = 1 - p_fail - p_cancel; with plan_wf = "match" it uses q_j + w_f (1 - q_j)."""
+    import dataclasses
+    from flex.policies import _info, world_from_config
+    rows = {"A": ([0], [(500.0, 600.0, 700.0, 0.2, 0.1)])}
+    job = FJob("A", "u", 0, 1, 5000, "Pass")
+    w = world_from_config(load_config(), Predictions("transformer", rows))
+    assert w.plan_wf == "zero"
+    assert abs(_info(None, w, "predictor", job, None)[2] - 0.7) < 1e-12
+    w1 = dataclasses.replace(w, plan_wf="match", cost=dataclasses.replace(w.cost, w_fail=1.0))
+    assert abs(_info(None, w1, "predictor", job, None)[2] - 1.0) < 1e-12
+    w5 = dataclasses.replace(w, plan_wf="match", cost=dataclasses.replace(w.cost, w_fail=0.5))
+    assert abs(_info(None, w5, "predictor", job, None)[2] - 0.85) < 1e-12

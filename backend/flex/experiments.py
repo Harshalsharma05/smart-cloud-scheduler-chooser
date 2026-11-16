@@ -345,6 +345,22 @@ def e1_blind(cfg, jobs, pool, events, predictors, predictor, quick):
     return run_events(cfg, jobs, pool, world, events, per_event, "e1_blind")
 
 
+def e1_planwf(cfg, jobs, pool, events, predictors, predictor, quick):
+    """W9b: delay-only and the p90 mix with transformer, gbdt and lightgbm on all E1 events, with the plan_wf / w_fail settings
+    of cfg (run with --plan-wf match --w-fail 1). The no-predictor delay-only is in results/e1_blind (it does not use q_j)."""
+    world = world_from_config(cfg, predictors["transformer"])
+    tag = f"plan_wf={cfg.get('plan_wf', 'zero')};w_fail={cfg['cost']['w_fail']}"
+
+    def per_event(snap, ev, base):
+        rows = []
+        for p in ("transformer", "gbdt", "lightgbm"):
+            w = dataclasses.replace(world, predictor=predictors[p])
+            rows.append(timed_row(cfg, "e1_planwf", snap, ev, "delay", w, base, p, setting=tag, pool=pool))
+            rows.append(timed_row(cfg, "e1_planwf", snap, ev, "mix", dataclasses.replace(w, cost_quantile="p90"), base, p, setting=tag + ";cq=p90", pool=pool))
+        return rows
+    return run_events(cfg, jobs, pool, world, events, per_event, "e1_planwf")
+
+
 def e2nc(cfg, jobs, pool, events, predictors, predictor, quick):
     """S13d (2): mix-nocloud (transformer p90, oracle) on the default cell for ONE pool (--pool) and prices 0.43 and 3.06."""
     world = world_from_config(cfg, predictors[predictor])
@@ -469,7 +485,7 @@ def baseline_waits(cfg, jobs, pool, out_dir, label):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m flex.experiments")
-    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e1_blind", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4"])
+    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e1_blind", "e1_planwf", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4"])
     ap.add_argument("--data", choices=["synthetic", "philly"], required=True)
     ap.add_argument("--predictor", default="last2")
     ap.add_argument("--quick", action="store_true", help="3 events per cell (and smaller sweeps)")
@@ -482,10 +498,16 @@ def main(argv=None):
     ap.add_argument("--lookup-rule", default=None, choices=["contract", "hold_beyond_grid"], help="e3: S14c prediction lookup rule beyond the last grid point")
     ap.add_argument("--part", default="default", choices=list(E3_PARTS), help="e3: default | hard | oos")
     ap.add_argument("--uninformed-before", default=None, help="W4: date; non-oracle predictors return uninformed values for jobs submitted before it")
+    ap.add_argument("--plan-wf", default=None, choices=["zero", "match"], help="W9b: plan with q_j (zero) or q_j + w_f (1 - q_j) (match)")
+    ap.add_argument("--w-fail", type=float, default=None, help="W9b: override cost.w_fail (accounting and, with --plan-wf match, planning)")
     ap.add_argument("--missing-pred", default=None, choices=["oracle", "uninformed"], help="W7: fallback for jobs without prediction rows")
     ap.add_argument("--tag", default="", help="suffix of the runs file for split runs (runs_<tag>.csv)")
     args = ap.parse_args(argv)
     cfg = load_config()
+    if args.plan_wf:
+        cfg["plan_wf"] = args.plan_wf
+    if args.w_fail is not None:
+        cfg["cost"]["w_fail"] = args.w_fail
     if args.missing_pred:
         cfg["missing_pred"] = args.missing_pred
     if args.uninformed_before:
@@ -513,7 +535,7 @@ def main(argv=None):
         auto = d["pool_gpus"]
         cfg["philly"]["pool_gpus"] = {"installed": d["installed_gpus"], "auto": "auto"}.get(args.pool, None) or int(round(float(args.pool) * auto))
     cfg, jobs, pool, events = load_setup(cfg, args.data, args.quick)
-    if args.exp in ("e1", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e1_blind") and (args.duration is not None or args.cut is not None):
+    if args.exp in ("e1", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e1_blind", "e1_planwf") and (args.duration is not None or args.cut is not None):
         events = [e for e in events if (args.duration is None or e.duration_h == args.duration) and (args.cut is None or abs(e.cut - args.cut) < 1e-9)]
     predictors = load_predictors(cfg, args.data)
     if args.predictor not in predictors:
@@ -534,7 +556,7 @@ def main(argv=None):
         rows = t4(cfg, jobs, pool, events, predictors, args.predictor, args.quick, args.only.split("|") if args.only else None)
     else:
         extra = dict(prices=[float(x) for x in args.prices.split("|")]) if (args.exp == "e2" and args.prices) else {}
-        rows = {"e1": e1, "e1nc": e1nc, "robust_missing": robust_missing, "robust_insample": robust_missing, "e1_learned": e1_learned, "e1_learned_nc": e1_learned_nc, "e1_blind": e1_blind, "e2": e2, "e2b": e2b, "e2nc": e2nc}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
+        rows = {"e1": e1, "e1nc": e1nc, "robust_missing": robust_missing, "robust_insample": robust_missing, "e1_learned": e1_learned, "e1_learned_nc": e1_learned_nc, "e1_blind": e1_blind, "e1_planwf": e1_planwf, "e2": e2, "e2b": e2b, "e2nc": e2nc}[args.exp](cfg, jobs, pool, events, predictors, args.predictor, args.quick, **extra)
     if args.tag:                                          # split runs: one file per piece, merged by the analysis script
         out = Path(out_dir) / args.exp
         out.mkdir(parents=True, exist_ok=True)

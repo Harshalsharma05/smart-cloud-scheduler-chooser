@@ -30,6 +30,7 @@ STEPS = [                                   # (label, command, cwd)
     ("W9 sensitivity table (t4_sens)", [PY, str(FIG / "make_t4_compact.py")], ROOT),
     ("W9 bootstrap CI over event days (csv)", [PY, str(FIG / "make_bootstrap.py")], ROOT),
     ("W9 no-predictor delay-only comparison (csv)", [PY, str(FIG / "make_blind.py")], ROOT),
+    ("W9b plan_wf variant at w_f = 1 (csv)", [PY, str(FIG / "make_planwf.py")], ROOT),
     ("W7 main table (t_main)", [PY, str(FIG / "make_t_main.py")], ROOT),
     ("T6 carbon table", [PY, "-m", "flex.e5_carbon", "table"], ROOT / "backend"),
 ]

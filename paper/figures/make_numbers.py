@@ -313,6 +313,18 @@ def compute():
             put(f"{nm_}OverBlind{k}", r.median_ratio, "f2")
             put(f"{nm_}OverBlindCheaper{k}", r.cheaper, "int")
 
+    pwf = pd.read_csv(RESULTS / "robust_planwf" / "summary.csv")                           # make_planwf.py (w_f = 1, plan_wf = match)
+    m_ = pwf[(pwf.plan_wf == "match") & (pwf.reference == "blind_delay")]
+    for r in m_.itertuples():
+        b_ = f"Planwf{ {'transformer': 'Trans', 'gbdt': 'Gbdt', 'lightgbm': 'Lightgbm'}[r.predictor]}"
+        put(f"{b_}OverBlind", r.median, "f3")
+        put(f"{b_}OverBlindLo", r.ci_lo, "f2")
+        put(f"{b_}OverBlindHi", r.ci_hi, "f2")
+        put(f"{b_}OverBlindCheaper", r.cheaper, "int")
+    put("PlanwfGainMinPct", 100 * (1 - m_["median"].max()), "f1")
+    put("PlanwfGainMaxPct", 100 * (1 - m_["median"].min()), "f1")
+    put("PlanwfDelayOverBlindMax", pwf[pwf.reference == "delay_vs_blind"]["median"].max(), "f2")
+
     # ---- predictor accuracy (test split)
     pm_ = pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv", dtype={"elapsed_s": str})
     allr = pm_[pm_["elapsed_s"] == "all"].set_index("predictor")
