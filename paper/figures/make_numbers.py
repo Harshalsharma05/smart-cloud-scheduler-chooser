@@ -249,7 +249,7 @@ def compute():
             put(f"{base}MixOverDelay{k}", getattr(r, f"mix_delay_{wn}"), "f3")
             put(f"{base}MixOverNocloud{k}", getattr(r, f"mix_nocloud_{wn}"), "f2")
             put(f"{base}Cheaper{k}", getattr(r, f"cheaper_{wn}"), "int")
-            put(f"{base}ReductionPct{k}", 100 * (1 - getattr(r, f"total_{wn}")), "int")
+            put(f"{base}ReductionPct{k}", 100 * (1 - getattr(r, f"total_{wn}")), "f1")
     main_ = la[la.variant == "main"]
     ratios = pd.concat([main_.mix_delay_wfail0, main_.mix_delay_wfail1])
     put("LearnedGainMinPct", 100 * (1 - ratios.max()), "int")       # per-event median gain of the p90 mix over delay-only
@@ -260,6 +260,58 @@ def compute():
     shift = max(abs(la[(la.predictor == p) & (la.variant == "masked")][c].iloc[0] - la[(la.predictor == p) & (la.variant == "main")][c].iloc[0])
                 for p in pn_ for c in ("mix_delay_wfail0", "mix_delay_wfail1"))
     put("LearnedMaskShiftMax", shift, "f3")
+
+    # ---- W9 (review fixes)
+    sens = pd.read_csv(RESULTS / "t4" / "sens_summary.csv").set_index("perturbation")      # make_t4_compact.py
+    for key, nm_ in (("default", "Default"), ("pessimistic cap curve", "Pessimistic"), ("host power x0.5", "HostHalf"),
+                     ("host power x1.5", "HostOneHalf")):
+        put(f"Sens{nm_}Ratio", sens.loc[key, "ratio"], "f2")
+        put(f"Sens{nm_}Cheaper", sens.loc[key, "cheaper"], "int")
+    put("SensEvents", sens.loc["default", "events"], "int")
+    sa = pd.read_csv(RESULTS / "s13" / "sweepA_ratios.csv")
+    sa = sa[sa["boot"] == cfg["cloud"]["boot_delay_s"]].set_index("price")                 # default boot delay; $/MWh ratios, default cell
+    for price, nm_ in ((0.43, "Spot"), (1.5, "Low"), (3.06, "Base"), (6.12, "Double")):
+        put(f"Price{nm_}Usd", price, "f2")
+        put(f"Price{nm_}BurstOverDelay", sa.loc[price, "burst/delay"], "int")
+    put("PriceSpotOracleMixOverDelay", sa.loc[0.43, "mix+oracle/delay+oracle"], "f2")
+    put("PriceSpotOracleMixCheaper", sa.loc[0.43, "mix+oracle<delay+oracle"], "int")
+    put("PriceSpotMixPNineOverDelay", sa.loc[0.43, "mix-p90/delay"], "f2")
+    put("PriceBaseOracleMixOverDelay", sa.loc[3.06, "mix+oracle/delay+oracle"], "f2")
+    bt = pd.read_csv(RESULTS / "bootstrap" / "ci.csv")                                      # make_bootstrap.py
+    for r in bt.itertuples():
+        b_ = f"Boot{ {'transformer': 'Trans', 'gbdt': 'Gbdt', 'lightgbm': 'Lightgbm'}[r.predictor]}"
+        k_ = "Zero" if r.wfail == "wfail0" else "One"
+        put(f"{b_}Lo{k_}", r.ci_lo, "f2")
+        put(f"{b_}Hi{k_}", r.ci_hi, "f2")
+    put("BootResamples", bt["resamples"].iloc[0], "int")
+    put("BootDays", bt["days"].iloc[0], "int")
+    mach = pd.read_parquet(ROOT / "data" / "processed" / "philly_machines.parquet")
+    put("MethMachines", len(mach), "int")
+    put("MethMachineGpus", mach["num_gpus"].sum(), "int")
+    sh = pd.read_csv(RESULTS / "s14b" / "hold" / "tables.csv").set_index(["variant", "set"])  # last2 under the hold rule, default cell
+    put("LastTwoHoldBurstFloorPct", 100 * sh.loc[("last2-p50", "burst"), "floor60"], "int")
+    put("LastTwoHoldRunningFloorPct", 100 * sh.loc[("last2-p50", "all running"), "floor60"], "int")
+    put("LastTwoHoldBurstActualRemH", sh.loc[("last2-p50", "burst"), "actual_rem_med_h"], "int")
+    tf = json.loads((ROOT / "runs" / "tf_v1" / "summary.json").read_text(encoding="utf-8"))      # Track 1 run summary (read only)
+    put("TfParams", tf["params"], "int")
+    put("TfEpochs", tf["epochs_run"], "int")
+    put("TfTrainMin", tf["epochs_run"] * tf["seconds_per_epoch"] / 60, "int")
+    bl = pd.concat([pd.read_csv(f, dtype={"selector": str, "predictor": str, "setting": str})
+                    for f in sorted((RESULTS / "e1_blind").glob("runs_*.csv"))]).fillna({"setting": ""})
+    bl = bl[bl["feasible"].astype(str) != "False"].set_index("event_id")
+    bdc = in_cell(bl.reset_index(), *DEFAULT)
+    for k, col in W.items():
+        put(f"BlindDelayUsd{k}", bdc[USD[k]].median(), "int")
+        put(f"BlindOverTransDelay{k}", ratio_stats(bl[col], dly_all[col])[0], "f2")
+        put(f"BlindOverOracleDelay{k}", ratio_stats(bl[col], e1[e1.who == "delay+oracle"].set_index("event_id")[col])[0], "f2")
+
+    bs = pd.read_csv(RESULTS / "e1_blind" / "summary.csv")                                  # make_blind.py: policy / blind delay-only
+    for pol, nm_ in (("transformer mix-p90", "TransMix"), ("gbdt mix-p90", "GbdtMix"), ("lightgbm mix-p90", "LightgbmMix"),
+                     ("oracle mix", "OracleMix"), ("gbdt delay", "GbdtDelay"), ("lightgbm delay", "LightgbmDelay")):
+        for k, wn in (("Zero", "wfail0"), ("One", "wfail1")):
+            r = bs[(bs.policy == pol) & (bs.wfail == wn)].iloc[0]
+            put(f"{nm_}OverBlind{k}", r.median_ratio, "f2")
+            put(f"{nm_}OverBlindCheaper{k}", r.cheaper, "int")
 
     # ---- predictor accuracy (test split)
     pm_ = pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv", dtype={"elapsed_s": str})

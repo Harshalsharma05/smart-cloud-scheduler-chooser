@@ -27,6 +27,9 @@ STEPS = [                                   # (label, command, cwd)
     ("W4 in-sample leakage check (csv)", [PY, str(FIG / "make_robust_insample.py")], ROOT),
     ("W8 gbdt / lightgbm p90 mix (csv)", [PY, str(FIG / "make_learned.py")], ROOT),
     ("W8b three learned predictors x masking (csv)", [PY, str(FIG / "make_learned_all.py")], ROOT),
+    ("W9 sensitivity table (t4_sens)", [PY, str(FIG / "make_t4_compact.py")], ROOT),
+    ("W9 bootstrap CI over event days (csv)", [PY, str(FIG / "make_bootstrap.py")], ROOT),
+    ("W9 no-predictor delay-only comparison (csv)", [PY, str(FIG / "make_blind.py")], ROOT),
     ("W7 main table (t_main)", [PY, str(FIG / "make_t_main.py")], ROOT),
     ("T6 carbon table", [PY, "-m", "flex.e5_carbon", "table"], ROOT / "backend"),
 ]

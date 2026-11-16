@@ -123,6 +123,7 @@ does not depend on them.
       `paper/numbers.tex`.
 - [x] **29. [You + Track 2 chat] W6-W8** (≈8 h): methodology, evaluation text, final pass, page fit, double-blind
       check. **Submit by 1 Dec AoE.**
+- [x] **30. [T2] W9 Fixes from the first-draft review** (sensitivity table, cloud price, w_f note, bootstrap CI, no-predictor delay-only, small fixes).
 
 ### Writing you can do any time (no Claude Code, with the Track 2 chat)
 
@@ -257,3 +258,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-15 | 29 (W8 final pass) | 5bb88b8 | gbdt/lightgbm p90 mix on 84 events (mix/delay 0.839/0.847 and 0.870/0.848 vs transformer 0.945/0.941); 6.E reworded; burst ratios as medians; F3/F4 captions; Table II one cap curve; bib venues fixed; abstract_easychair.txt (199 words); build 9 pages, 0 overfull, 0 undefined, 0 [CITE?]; claims 9/9; zip ready |
 | 2026-11-15 | W8b Part 1 (runs) | e7b9a2c | mix-nocloud p90 and in-sample masking for gbdt/lightgbm (84 events): mix/nocloud = 1.00 for all three learned predictors; mix/delay main 0.839-0.945, masked shift <= 0.03 (lightgbm 0.029); liu13 -> Performance Evaluation 70(10) (DBLP) |
 | 2026-11-15 | W8b Part 3 (abstract + text) | b73f1c1 | abstract (199 words): learned models (transformer, gradient-boosted trees), gain 5-16% per event depending on predictor, offloading ~0 for all three; ABSTRACT_CLAIMS + check_claims 9/9; Sec. 1/6/8 reframed, Table III with gbdt/lightgbm rows; captions shortened; build 9 pages, 0 overfull; zip ready |
+| 2026-11-16 | 30 (W9 review fixes) | pending | T4 sensitivity table (pessimistic cap curve: gain gone, 1.00; host power x0.5/x1.5: 0.72/0.92); cloud price paragraph; w_f note (Eq. 7); bootstrap 95% CI over 10 event days (all < 1); no-predictor delay-only on 84 events (w_f 0: 1.27x transformer delay; w_f 1: 0.83x, cheaper than every delay-only and than the transformer mix); abstract 200 words (default cap curve, 11-68x, exact (oracle)); build 10 pages, 0 overfull; claims 9/9 |

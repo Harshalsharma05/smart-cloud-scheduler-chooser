@@ -91,7 +91,7 @@ def f8(df, name="f8_selectors"):
     order = ["none-largest", "random"] + PREDS
     y = np.arange(len(order))
     fig, axes = plt.subplots(1, 3, figsize=(2 * WIDTH_IN, 2.6), sharey=True)
-    fig.subplots_adjust(left=0.10, right=0.99, top=0.90, bottom=0.34, wspace=0.08)
+    fig.subplots_adjust(left=0.12, right=0.99, top=0.90, bottom=0.34, wspace=0.08)
     h = 0.8 / (2 * len(rules))
     for i, pol in enumerate(("burst", "mix")):
         for k, rule in enumerate(rules):
@@ -116,7 +116,8 @@ def f8(df, name="f8_selectors"):
         ax.tick_params(labelsize=6.5)
         ax.grid(axis="x", lw=0.3, color="0.8")
         ax.set_axisbelow(True)
-    axes[0].set_yticks(y, order)
+    names = {"last2": "last-two-jobs", "gbdt": "gradient-" + chr(10) + "boosted trees", "lightgbm": "LightGBM"}   # W9: text names
+    axes[0].set_yticks(y, [names.get(o, o) for o in order])
     axes[0].invert_yaxis()
     handles = [Patch(color=COLORS["burst"], label="burst"), Patch(color=COLORS["mix"], label="mix")]
     if len(rules) > 1:

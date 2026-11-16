@@ -26,7 +26,12 @@ def main():
     lr = lr[lr["feasible"].astype(str) != "False"]
     lr["who"] = lr.apply(lambda r: {"": "delay", "cq=p90": "mix-p90", "nocloud;cq=p90": "nocloud p90"}[r["setting"]] + f" ({r['predictor']})", axis=1)
     lr["shed_pct"] = 100.0 * lr["shed_mwh"] / (lr["cut"] * lr["base_mean_kw"] * lr["duration_h"] / 1000.0)
-    d = pd.concat([e1, nc, lr], ignore_index=True)
+    bl = pd.concat([pd.read_csv(f, dtype={"selector": str, "predictor": str, "setting": str})
+                    for f in sorted(glob.glob(str(ROOT / "results" / "e1_blind" / "runs_*.csv")))], ignore_index=True).fillna({"setting": ""})
+    bl = bl[bl["feasible"].astype(str) != "False"]
+    bl["who"] = "delay (blind)"
+    bl["shed_pct"] = 100.0 * bl["shed_mwh"] / (bl["cut"] * bl["base_mean_kw"] * bl["duration_h"] / 1000.0)
+    d = pd.concat([e1, nc, lr, bl], ignore_index=True)
     rows = [  # (label, who, delay reference)
         (r"\multicolumn{5}{@{}l}{\emph{Transformer predictor}}", None, None),
         ("delay-only", "delay", "delay"),
@@ -43,6 +48,8 @@ def main():
         ("delay-only", "delay (lightgbm)", "delay (lightgbm)"),
         ("mix, p90 bill", "mix-p90 (lightgbm)", "delay (lightgbm)"),
         ("mix-nocloud, p90", "nocloud p90 (lightgbm)", "delay (lightgbm)"),
+        (r"\multicolumn{5}{@{}l}{\emph{No predictor} (ratio to the transformer's delay-only)}", None, None),
+        ("delay-only", "delay (blind)", "delay"),
         (r"\multicolumn{5}{@{}l}{\emph{Last-two-jobs predictor}}", None, None),
         ("mix", "mix (last2)", "delay (last2)"),
         (r"\multicolumn{5}{@{}l}{\emph{Oracle (upper bound)}}", None, None),

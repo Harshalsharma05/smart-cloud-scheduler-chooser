@@ -11,7 +11,7 @@
   pow/.style={->, densely dotted, thick}]
   % nodes
   \node[box, rounded corners=4pt] (grid) at (0,0) {Grid operator};
-  \node[box, fill=black!6] (pred) at (5.2,0) {Predictor\\(transformer over each user's past jobs)};
+  \node[box, fill=black!6] (pred) at (5.2,0) {Predictor\\(learned model, e.g.\ transformer or trees)};
   \node[box, double, double distance=1.2pt, text width=3.0cm] (ctrl) at (2.6,-2.4) {Mix controller\\target $P^\star=(1-\kappa)\bar P_0$};
   \node[box, very thick] (clu) at (0,-4.5) {On-premise cluster\\$G$ GPUs, FCFS queue, admission gate};
   \node[draw, ellipse, align=center, text width=1.7cm, inner sep=1pt] (cloud) at (5.2,-4.5) {Cloud\\$\pi$ per GPU-h,\\boot $\tau_b$};

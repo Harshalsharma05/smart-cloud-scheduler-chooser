@@ -126,7 +126,8 @@ def delay_only(eng, event, p_star, params, *, world, selector="predictor", rng=N
     d_s = event.t_end - event.t_start
     kw = lambda j: start_delta_kw(params, j, eng.cap_f)
     jobs = [j for j in _running_jobs(eng) if kw(j) > 0]
-    for job in _order(jobs, "predictor", None, lambda j: hold_cost(eng, world, "predictor", j, event, d_s) / kw(j)):
+    # W9: a non-predictor selector ("blind") ranks by the same cost per kW, but with q = 1 and no deadline term (hold_cost/_info)
+    for job in _order(jobs, "predictor", None, lambda j: hold_cost(eng, world, selector, j, event, d_s) / kw(j)):
         if power_kw(eng, params) <= p_star:
             break
         eng.suspend(job)
