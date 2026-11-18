@@ -1,0 +1,7 @@
+# Demo notebook only, installed into ml/.venv (which already has torch, pandas, lightgbm).
+# Adds the notebook runner and the two simulator needs (pyyaml for configs/flex.yaml, matplotlib for plots).
+nbconvert
+nbclient
+ipykernel
+pyyaml
+matplotlib
