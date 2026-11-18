@@ -124,6 +124,7 @@ does not depend on them.
 - [x] **29. [You + Track 2 chat] W6-W8** (≈8 h): methodology, evaluation text, final pass, page fit, double-blind
       check. **Submit by 1 Dec AoE.**
 - [x] **30. [T2] W9 Fixes from the first-draft review** (sensitivity table, cloud price, w_f note, bootstrap CI, no-predictor delay-only, small fixes).
+- [x] **31. [T2] DEMO proof-of-work notebook for the faculty** (`demo/demo.ipynb` + `demo.html`; read-only, re-runs the transformer and one E1 event live).
 
 ### Writing you can do any time (no Claude Code, with the Track 2 chat)
 
@@ -262,3 +263,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-16 | W9b Part 1 (scoped abstract) | 6eadddc | abstract claim scoped to w_f=0 (200 words, small wording trims, all claims and numbers kept); intro/6.B/conclusion scoped; gain range from w_f 0 ratios (5-16%); claims 9/9 |
 | 2026-11-16 | W9b Part 2 (plan_wf variant) | 2879b8a | plan_wf: zero|match option (default zero) + test (23 pass); at w_f=1 with match: mix-p90 / no-predictor delay-only 0.943 (transformer), 0.944 (gbdt), 0.941 (lightgbm), CIs 0.91-0.96, cheaper in 64-67/84; same-predictor delay = no-predictor delay; Sec. 6 robustness + Sec. 8 updated |
 | 2026-11-16 | W9b Part 3 (page margin) | f6d45f2 | wording trims in Sec. 2 (A: request/price paragraph merged and shortened; C: one lead sentence cut) and Sec. 7 (bursting lead-in); no table, figure, number or limitation removed; build 10 pages, last page right column 2 lines used (~60 free); zip ready |
+| 2026-11-18 | 31 (DEMO) | b9fe1b2 | demo/demo.ipynb executed top to bottom in 81 s (nbconvert) + demo.html; live transformer on 5 test examples (seed 0) = transformer.csv within 2e-6 (CPU vs GPU); live d2h_c20_0 delay / burst / mix-p90 = results/e1/runs.csv exactly (diff 0); 23 + 6 tests pass, 5 checker OKs; notebook tools installed into ml/.venv (demo/requirements.txt) |
