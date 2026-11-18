@@ -1,4 +1,4 @@
-# Paper: Burst to Flex (CCGrid 2027)
+# Paper: Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU Clusters (CCGrid 2027)
 
 IEEEtran conference, 10 pages including references, double-blind (no names, university, repo links, PDF metadata).
 Section files are in `sections/`, each with its page budget as a comment (budgets: docs/track-2/PAPER_PLAN.md section 1).

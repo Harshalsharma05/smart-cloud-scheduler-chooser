@@ -2,7 +2,7 @@
 
 ## What this project is
 Started as the minor project "Smart Scheduler Chooser" (a cluster + cloud simulator with a React demo). It is now the
-research code for the IEEE CCGrid 2027 paper "Burst to Flex: Cloud Offloading as Grid Flexibility for On-Premise GPU
+research code for the IEEE CCGrid 2027 paper "Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU
 Clusters": when the grid asks a GPU cluster to cut power, compare delay, power-cap and burst-to-cloud in $ per MWh shed
 on the Microsoft Philly trace, with a controller that picks jobs to burst using predicted remaining runtime and failure risk.
 

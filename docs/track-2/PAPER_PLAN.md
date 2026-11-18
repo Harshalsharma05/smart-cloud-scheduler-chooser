@@ -1,4 +1,4 @@
-# Track 2 plan: the paper ("Burst to Flex", CCGrid 2027)
+# Track 2 plan: the paper ("Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU Clusters", CCGrid 2027)
 
 Version 1, 11 Nov 2026. Companion to `SIM_PLAN.md` (phases S0–S16). Figure and table IDs here are the ones used in SIM_PLAN.
 

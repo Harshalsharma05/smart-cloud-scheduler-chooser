@@ -1,4 +1,4 @@
-# Track 2 plan: simulator and experiments ("Burst to Flex", CCGrid 2027)
+# Track 2 plan: simulator and experiments ("Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU Clusters", CCGrid 2027)
 
 Owner: Harshal. Reviewed in the Track 2 chat. Version 1, 11 Nov 2026.
 Source of truth for the project: `claude/PROJECT_CONTEXT.md` v2 (sections 6, 7, 7b, 9, 10).

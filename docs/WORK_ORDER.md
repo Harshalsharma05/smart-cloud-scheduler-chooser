@@ -1,4 +1,4 @@
-# Work order: which phase to run when (Burst to Flex, CCGrid 2027)
+# Work order: which phase to run when (Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU Clusters, CCGrid 2027)
 
 Version 1, 12 Nov 2026. Written in the main planning chat. This file decides the **order of Claude Code sessions**
 across the two tracks, and the rules for switching between them. It does not change what a phase does: that is in
@@ -264,3 +264,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-16 | W9b Part 2 (plan_wf variant) | 2879b8a | plan_wf: zero|match option (default zero) + test (23 pass); at w_f=1 with match: mix-p90 / no-predictor delay-only 0.943 (transformer), 0.944 (gbdt), 0.941 (lightgbm), CIs 0.91-0.96, cheaper in 64-67/84; same-predictor delay = no-predictor delay; Sec. 6 robustness + Sec. 8 updated |
 | 2026-11-16 | W9b Part 3 (page margin) | f6d45f2 | wording trims in Sec. 2 (A: request/price paragraph merged and shortened; C: one lead sentence cut) and Sec. 7 (bursting lead-in); no table, figure, number or limitation removed; build 10 pages, last page right column 2 lines used (~60 free); zip ready |
 | 2026-11-18 | 31 (DEMO) | b9fe1b2 | demo/demo.ipynb executed top to bottom in 81 s (nbconvert) + demo.html; live transformer on 5 test examples (seed 0) = transformer.csv within 2e-6 (CPU vs GPU); live d2h_c20_0 delay / burst / mix-p90 = results/e1/runs.csv exactly (diff 0); 23 + 6 tests pass, 5 checker OKs; notebook tools installed into ml/.venv (demo/requirements.txt) |
+| 2026-11-18 | Title change | (this commit) | title "Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU Clusters" in main.tex (title, pdftitle), CLAUDE.md, plan headers, paper/README, demo notebook/html; author block "Author(s)"; build 10 pages, 0 overfull, 0 undefined, blind scan 0; overleaf_upload.zip rebuilt (26 files, 0 missing) |

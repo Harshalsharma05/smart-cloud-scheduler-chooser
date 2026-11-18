@@ -1,4 +1,4 @@
-# Track 1 plan: ML / transformer (Burst to Flex, CCGrid 2027)
+# Track 1 plan: ML / transformer (Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU Clusters, CCGrid 2027)
 
 Version 1.1, 12 Nov 2026 (machines parquet required; session-start prompt; progress log). Scope: phases T0–T5. Code lives in `ml/`. This file is the source of truth for work in `ml/`.
 Contract with Track 2: `claude/PROJECT_CONTEXT.md` section 7 (v2). If this plan and the contract disagree, the contract wins. Raise the difference in the Track 1 review chat; don't decide it in code.
