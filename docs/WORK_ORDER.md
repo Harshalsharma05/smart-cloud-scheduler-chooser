@@ -126,6 +126,7 @@ does not depend on them.
 - [x] **30. [T2] W9 Fixes from the first-draft review** (sensitivity table, cloud price, w_f note, bootstrap CI, no-predictor delay-only, small fixes).
 - [x] **31. [T2] DEMO proof-of-work notebook for the faculty** (`demo/demo.ipynb` + `demo.html`; read-only, re-runs the transformer and one E1 event live).
 - [x] **32. [T1] A1 AcmeTrace loader + characterization** (job traces only; `ml/acme_load.py`, `ml/reports/A1_acme_report.md`). Philly code, data, predictions and results untouched.
+- [x] **34. [T1] A2 Acme predictions, Seren only** (`--dataset acme` switch; `predictions/acme_<name>.csv`, `ml/reports/A2_acme_predictions.md`). Philly outputs unchanged. **→ Track 2 chat:** "5 Acme prediction files pass the checker; step 35 (Acme simulator run) can start".
 
 ### Writing you can do any time (no Claude Code, with the Track 2 chat)
 
@@ -268,3 +269,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-18 | Title change | (this commit) | title "Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU Clusters" in main.tex (title, pdftitle), CLAUDE.md, plan headers, paper/README, demo notebook/html; author block "Author(s)"; build 10 pages, 0 overfull, 0 undefined, blind scan 0; overleaf_upload.zip rebuilt (26 files, 0 missing) |
 | 2026-11-18 | Layout fixes | (this commit) | xurl for footnote URLs, footnotes 1-4 ragged-right (stay footnotes, not references); "VIII. Discussion and Limitations" + "IX. Conclusion" (same text); build 10 pages, 0 overfull, 0 undefined, blind scan 0; overleaf_upload.zip rebuilt (26 files, 0 missing) |
 | 2026-11-19 | 32 (A1) | b8c3e79 | acme_jobs.parquet: 470,497 GPU jobs (Seren 450,590, Kalos 19,907); Seren +08:00, Kalos +00:00 (both China-time workloads); Failed+Killed = 78.8% / 68.1% of GPU-h vs Philly 66.9%; >12 h jobs hold 52% / 57% of running GPUs at 17-20h vs Philly 87%; max 1,024 GPUs; power = CDF curves only (idle ~63 W, p90 ~400 W) |
+| 2026-11-19 | 34 (A2) | c8ccf90 | Acme Seren: 746,187 example rows (train 259k / val 155k / test 332k); key set 431,759 rows, 231,876 jobs; test pinball transformer 0.275, gbdt 0.276, lightgbm 0.276, last2 0.545; status log-loss 0.562 / 0.605 / 0.596 vs prior 0.928; type adds little; Philly outputs byte-identical; 6 tests pass |
