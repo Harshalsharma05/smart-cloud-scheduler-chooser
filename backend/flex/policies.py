@@ -35,13 +35,15 @@ class World:
     cost_quantile: str = "p50"           # S14: runtime quantile in the burst cloud bill ("p50" default, "p90" variant)
     burst_min_submit: int | None = None  # S14 robustness: only jobs submitted at or after this simulated time may be burst
     plan_wf: str = "zero"                # W9b: "zero" = plan with q_j (current); "match" = plan with q_j + w_f (1 - q_j), w_f = cost.w_fail
+    p_useful: str = "fail_cancel"        # step 35: q_j = 1 - p_fail - p_cancel (Philly); "fail_only" = 1 - p_fail (Acme, M1)
 
 
 def world_from_config(cfg, predictor, curve_variant=None):
     params = power_params_from_config(cfg)
     return World(params, make_speed_fn(params, curve_from_config(cfg, curve_variant)), list(cfg["cap_levels"]),
                  cloud_params_from_config(cfg), cost_params_from_config(cfg), predictor,
-                 int(cfg["grid"]["h_after_h"] * 3600), int(cfg["cloud"]["restore_s"]), plan_wf=cfg.get("plan_wf", "zero"))
+                 int(cfg["grid"]["h_after_h"] * 3600), int(cfg["cloud"]["restore_s"]), plan_wf=cfg.get("plan_wf", "zero"),
+                 p_useful=cfg.get("p_useful", "fail_cancel"))
 
 
 # ---- per-job estimates (predictions only) ----
@@ -58,7 +60,7 @@ def _info(eng, world, selector, job, event, quantile="p50"):
     elapsed = progress(eng, job)
     if selector == "predictor":
         _, p50, p90, p_fail, p_cancel = world.predictor.lookup(job, elapsed)
-        q = max(0.0, 1.0 - p_fail - p_cancel)
+        q = max(0.0, 1.0 - p_fail - (0.0 if world.p_useful == "fail_only" else p_cancel))
         if world.plan_wf == "match":          # W9b: delay of Failed/Killed work is weighted by w_f in the plan as in the accounting
             q = q + world.cost.w_fail * (1.0 - q)
         return elapsed, (p90 if quantile == "p90" else p50), q

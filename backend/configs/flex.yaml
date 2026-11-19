@@ -84,3 +84,22 @@ carbon:                   # E5 side check: annual AVERAGE CO2 emission rates, g 
   cloud_us_west_2: 286.5  # source: eGRID2023 Table 1, NWPP 631.7 lb/MWh (subregion mapping chosen by us), accessed 2026-11-15
   cloud_us_east_1: 267.7  # source: eGRID2023 Table 1, SRVC 590.2 lb/MWh (subregion mapping chosen by us), accessed 2026-11-15
   cloud_us_east_2: 413.4  # source: eGRID2023 Table 1, RFCW 911.3 lb/MWh (subregion mapping chosen by us), accessed 2026-11-15
+
+acme:                     # step 35 (S-A1): AcmeTrace Seren, read only with --data acme; overrides the Philly values below, nothing else changes
+  cluster: seren          # source: decision of 19 Nov 2026 (main review chat): Seren only
+  pool_gpus: 2288         # source: Hu et al., "Characterization of Large Language Model Development in the Datacenter", NSDI 2024, Table 1 (Seren: 2,288 A100 GPUs), accessed 2026-11-19
+  # Time window: ACME_SIM_START, ACME_TEST_START, ACME_TEST_END are read from ml/config.py (never copied here).
+  p_useful: fail_only     # source: decision of 19 Nov 2026 (M1): waste = FAILED/NODE_FAIL/TIMEOUT only; CANCELLED and PREEMPTED are useful work, so P(useful) = 1 - p_fail
+  util: 0.612             # derived (SA1 calibration, python -m traces.acme): one cluster-wide utilisation u so the simulated mean GPU power over the test window is 169 W (target_gpu_power_w); u = (169 - 63) / ((400 - 63) x 0.514 simulated busy share) = 0.612
+  target_gpu_power_w: 169 # source: AcmeTrace data/utilization/util_pkl/gpu_power_seren.pkl, mean of the Seren GPU power CDF (168.6 W, August 2023 data; the test window is July), github.com/InternLM/AcmeTrace, accessed 2026-11-19
+  power:
+    p_idle_w: 63          # source: AcmeTrace gpu_power_seren.pkl, idle floor (CDF p10 = 63.0 W; the lowest quarter of samples sit at 60-66 W); Hu et al. NSDI 2024 Sec. 6 power figure, accessed 2026-11-19
+    p_max_w: 400          # source: NVIDIA A100 Tensor Core GPU datasheet, Max TDP 400 W (A100 40GB/80GB SXM). URL: https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/a100/pdf/nvidia-a100-datasheet-us-nvidia-1758950-r4-web.pdf, accessed 2026-11-19
+    h_idle_w: 115         # derived: AcmeTrace server_power.pkl, GPU-node server power CDF p1 = 1,421 W = idle host + 8 idle GPUs; (1,421 - 8 x 63) / 8 = 114.6 W per GPU, accessed 2026-11-19
+    h_busy_w: 163         # derived: server_power.pkl GPU-node p99 = 5,418 W = idle host (917 W) + 8 x (400 W + h_busy); (5,418 - 917 - 3,200) / 8 = 162.7 W per GPU, accessed 2026-11-19
+    # pue, cloud_pue: the Philly values (same PUE as Philly, decision M2)
+  cloud:
+    price_per_gpu_h: 2.745  # source: AWS EC2 p4d.24xlarge (8 x A100 40GB) on-demand Linux us-east-1 $21.957642/h / 8 = $2.745 per GPU-h, read on instances.vantage.sh/aws/ec2/p4d.24xlarge (page updated 2026-11-19); spot $14.777/h. Accessed 2026-11-19
+    max_cloud_gpus: 1000    # source: decision of 19 Nov 2026 (M4), the Philly default; jobs larger than the limit cannot burst
+  grid:
+    tz: Asia/Shanghai       # source: decision of 19 Nov 2026 (M3): events start 17:00-19:30 China time (UTC+8); start hours, grid and slots as Philly

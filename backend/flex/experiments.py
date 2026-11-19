@@ -18,7 +18,7 @@ from .cloud import Cloud
 from .engine import Engine
 from .grid import epoch_from_iso, generate_events
 from .metrics import COLUMNS
-from .models import load_config
+from .models import DONE, load_config
 from .paired import baseline_snapshots, run_base
 from .policies import run_policy, world_from_config
 from .predictions import load_predictions
@@ -42,6 +42,16 @@ def predictions_dir(cfg, data):
 
 def load_setup(cfg, data, quick):
     """Jobs, pool size, epoch, the baseline-engine factory and all events for one data source."""
+    if data == "acme":                                             # step 35: AcmeTrace Seren, flex.yaml acme: section
+        from traces.acme import acme_config, load_acme
+        cfg = acme_config(cfg)
+        if quick:
+            cfg["grid"]["events_per_cell"] = 3
+        L = load_acme(cfg)
+        print(f"Acme ({cfg['acme']['cluster']}): {len(L['jobs'])} jobs, pool G = {L['G']}, {len(L['events'])} events; "
+              f"carry-over {L['report']['carry_jobs']} jobs, truncated {L['report']['carry_truncated']}; u = {L['report']['util']}")
+        cfg["_acme_info"] = L["info"]
+        return cfg, L["jobs"], L["G"], L["events"]
     if data == "philly":                                           # S8/S9c: real trace, pool from philly.pool_gpus
         from traces.philly import load_philly
         cfg = copy.deepcopy(cfg)
@@ -72,7 +82,8 @@ def load_setup(cfg, data, quick):
 def load_predictors(cfg, data):
     """Every prediction file that exists; the missing names are listed, never faked."""
     pdir = predictions_dir(cfg, data)
-    found = {n: load_predictions(pdir / f"{n}.csv") for n in ALL_PREDICTORS if (pdir / f"{n}.csv").exists()}
+    pre = "acme_" if data == "acme" else ""                          # step 35: predictions/acme_<name>.csv, loaded under <name>
+    found = {n: load_predictions(pdir / f"{pre}{n}.csv", name=n) for n in ALL_PREDICTORS if (pdir / f"{pre}{n}.csv").exists()}
     for pr in found.values():
         pr.lookup_rule = cfg.get("lookup_rule", "contract")
         pr.missing_pred = cfg.get("missing_pred", "oracle")
@@ -81,7 +92,7 @@ def load_predictors(cfg, data):
         from traces.philly import ml_config, utc_epoch
         for pr in found.values():
             pr.uninformed_before_s = utc_epoch(before) - utc_epoch(ml_config().SIM_START)
-    missing = [n for n in ALL_PREDICTORS if n not in found]
+    missing = [pre + n for n in ALL_PREDICTORS if n not in found]
     if missing:
         print("prediction files not found (not run):", ", ".join(missing))
     return found
@@ -412,6 +423,89 @@ def e3(cfg, jobs, pool, events, predictors, predictor, quick, part="default", mi
     return run_events(cfg, jobs, pool, world, cell(events, dur, cut), per_event, f"e3-{part}")
 
 
+# ---- step 35 (S-A1): Acme Seren ----
+
+def prune_snapshot(snap, t_stop):
+    """Step 35 (speed only, results unchanged): drop arrivals after t_stop (every run of this start drops them anyway) and the
+    jobs already DONE (identical in the baseline and every policy run, so they add 0 to every metric). The DONE count is kept
+    in snap.info["n_done_pruned"] for the user-impact means. Acme only; the Philly runs never call it."""
+    snap.truncate_arrivals(t_stop)
+    in_heap = {item[3] for item in snap.heap}
+    done = [jid for jid, j in snap.jobs.items() if j.state == DONE and jid not in in_heap]
+    for jid in done:
+        del snap.jobs[jid]
+    snap.info["n_done_pruned"] = snap.info.get("n_done_pruned", 0) + len(done)
+    return snap
+
+
+ACME_PRICES = [1.5, 4.1]      # USD per GPU-h, default cell only: 1.5 = the cheap-price run (decision of 19 Nov); 4.1 = the expected listing (sensitivity)
+
+
+def acme_e1(cfg, jobs, pool, events, predictors, predictor, quick, side=None):
+    """Per event: cap (no predictor); delay, burst, mix (p50), mix (p90 cloud bill) and mix-nocloud (p90) with every predictor;
+    default cell only: mix (oracle), mix-p90 (transformer) and burst (oracle, transformer) at ACME_PRICES (c_delay unchanged, as E2).
+    side (dict of lists) collects one row per event (running GPUs, GPUs of jobs above the cloud limit) and one per burst job."""
+    from .cloud import instance_cost
+    world = world_from_config(cfg, predictors[predictor])
+    info = cfg["_acme_info"]
+    names = [n for n in ALL_PREDICTORS if n in predictors]
+    lim = world.cloud.max_gpus
+    side = side if side is not None else {"events": [], "bursts": []}
+
+    def run(snap, ev, name, w, base, pname="", setting=""):
+        t = time.perf_counter()
+        row, _, pol = run_policy(snap, ev, name, w, pname, "predictor", cfg["seed"], base, return_runs=True)
+        row.update(exp="acme_e1", setting=setting, runtime_s=round(time.perf_counter() - t, 3), seed=cfg["seed"],
+                   feasible=bool(row["target_kw"] >= floor_kw(w.params, pool) - 1e-9))
+        cl = pol.engine.cloud
+        for inst in (cl.instances if cl is not None else []):
+            j = pol.engine.jobs[inst.job_id]
+            jid = j.job_id
+            side["bursts"].append(dict(event_id=ev.event_id, duration_h=ev.duration_h, cut=ev.cut, policy=name, predictor=pname,
+                                       setting=setting, job_id=jid, gpus=j.gpus, burst_rem_s=j.burst_rem, wall_s=j.wall_s,
+                                       carry=j.carry, sim_status=j.status, type=info.at[jid, "type"] if jid in info.index else "",
+                                       raw_state=info.at[jid, "raw_state"] if jid in info.index else "",
+                                       usd=instance_cost(cl.params, inst, pol.engine.now)))
+        return row
+
+    def per_event(snap, ev, base):
+        run_jobs = [snap.jobs[i] for i in snap.running]
+        side["events"].append(dict(event_id=ev.event_id, t_start=ev.t_start, duration_h=ev.duration_h, cut=ev.cut,
+                                   running_jobs=len(run_jobs), running_gpus=sum(j.gpus for j in run_jobs),
+                                   gpus_above_cloud_limit=sum(j.gpus for j in run_jobs if j.gpus > lim),
+                                   jobs_above_cloud_limit=sum(j.gpus > lim for j in run_jobs),
+                                   base_mean_kw=base.tracker.mean_kw(ev.t_start, ev.t_end), floor_kw=floor_kw(world.params, pool)))
+        rows = [run(snap, ev, "cap", world, base)]
+        for p in names:
+            w = dataclasses.replace(world, predictor=predictors[p])
+            rows += [run(snap, ev, n, w, base, p) for n in ("delay", "burst", "mix")]
+            rows.append(run(snap, ev, "mix", dataclasses.replace(w, cost_quantile="p90"), base, p, "cq=p90"))
+            rows.append(run(snap, ev, "mix", nocloud_world(world, predictors[p], "p90"), base, p, "nocloud;cq=p90"))
+        if (ev.duration_h, ev.cut) == DEFAULT_EVENT:
+            for price in ACME_PRICES:
+                wp = cloud_variant(world, price, world.cloud.boot_delay_s, lim)
+                st = f"price={price}"
+                for name, p, q in (("mix", "oracle", "p50"), ("mix", "transformer", "p90"), ("burst", "oracle", "p50"), ("burst", "transformer", "p50")):
+                    if p in predictors:
+                        rows.append(run(snap, ev, name, dataclasses.replace(wp, predictor=predictors[p], cost_quantile=q), base, p,
+                                        st + (";cq=p90" if q == "p90" else "")))
+        return rows
+    eng = Engine(jobs, pool, check_every=cfg["check_every"], cloud=Cloud(world.cloud))
+    by_start = {}
+    for e in events:
+        by_start.setdefault(e.t_start, []).append(e)
+    rows, done, t0 = [], 0, time.perf_counter()
+    for t_s, snap in baseline_snapshots(eng, by_start):
+        prune_snapshot(snap, max(e.t_end for e in by_start[t_s]) + world.h_after_s)
+        for ev in by_start[t_s]:
+            base = run_base(snap, ev, world.params, world.h_after_s)
+            rows += per_event(snap, ev, base)
+            done += 1
+        print(f"  acme_e1: {done}/{len(events)} events, {time.perf_counter() - t0:.0f} s", flush=True)
+    side["fallback"] = [dict(predictor=n, jobs_without_rows=len(pr.fallback_jobs)) for n, pr in predictors.items()]
+    return rows, side
+
+
 # ---- output ----
 
 def summarise(runs):
@@ -485,8 +579,8 @@ def baseline_waits(cfg, jobs, pool, out_dir, label):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m flex.experiments")
-    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e1_blind", "e1_planwf", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4"])
-    ap.add_argument("--data", choices=["synthetic", "philly"], required=True)
+    ap.add_argument("exp", choices=["e1", "e1merge", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e1_blind", "e1_planwf", "e2", "e2b", "e2nc", "e3", "e4", "e5", "t4", "acme_e1", "acme_e1merge"])
+    ap.add_argument("--data", choices=["synthetic", "philly", "acme"], required=True)
     ap.add_argument("--predictor", default="last2")
     ap.add_argument("--quick", action="store_true", help="3 events per cell (and smaller sweeps)")
     ap.add_argument("--out", default=None, help="results directory (default: <repo>/results)")
@@ -501,6 +595,7 @@ def main(argv=None):
     ap.add_argument("--plan-wf", default=None, choices=["zero", "match"], help="W9b: plan with q_j (zero) or q_j + w_f (1 - q_j) (match)")
     ap.add_argument("--w-fail", type=float, default=None, help="W9b: override cost.w_fail (accounting and, with --plan-wf match, planning)")
     ap.add_argument("--missing-pred", default=None, choices=["oracle", "uninformed"], help="W7: fallback for jobs without prediction rows")
+    ap.add_argument("--cells", default=None, help="acme_e1: only these cells, e.g. 2:0.2|4:0.2|4:0.3 (split runs)")
     ap.add_argument("--tag", default="", help="suffix of the runs file for split runs (runs_<tag>.csv)")
     args = ap.parse_args(argv)
     cfg = load_config()
@@ -522,6 +617,15 @@ def main(argv=None):
         summarise(runs).to_csv(out_dir / "e1" / "summary.csv", index=False)
         print(f"merged {len(files)} files, {len(runs)} rows, {runs['event_id'].nunique()} events")
         return
+    if args.exp == "acme_e1merge":                           # step 35: merge the split Acme runs (runs_/events_/bursts_<tag>.csv)
+        d = out_dir / "acme_e1"
+        for kind in ("runs", "events", "bursts", "fallback"):
+            files = sorted(d.glob(f"{kind}_*.csv"))
+            df = pd.concat([pd.read_csv(f, dtype={"selector": str, "predictor": str, "setting": str, "job_id": str}) for f in files], ignore_index=True)
+            df.to_csv(d / f"{kind}.csv", index=False)
+            print(f"{kind}: {len(files)} files, {len(df)} rows")
+        summarise(pd.read_csv(d / "runs.csv", dtype={"selector": str, "predictor": str, "setting": str})).to_csv(d / "summary.csv", index=False)
+        return
     if args.exp == "e4":
         if not (out_dir / "e1" / "runs.csv").exists():
             main(["e1", "--data", args.data, "--predictor", args.predictor] + (["--quick"] if args.quick else [])
@@ -535,11 +639,28 @@ def main(argv=None):
         auto = d["pool_gpus"]
         cfg["philly"]["pool_gpus"] = {"installed": d["installed_gpus"], "auto": "auto"}.get(args.pool, None) or int(round(float(args.pool) * auto))
     cfg, jobs, pool, events = load_setup(cfg, args.data, args.quick)
-    if args.exp in ("e1", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e1_blind", "e1_planwf") and (args.duration is not None or args.cut is not None):
+    if args.exp in ("e1", "acme_e1", "e1nc", "robust_missing", "robust_insample", "e1_learned", "e1_learned_nc", "e1_blind", "e1_planwf") and (args.duration is not None or args.cut is not None):
         events = [e for e in events if (args.duration is None or e.duration_h == args.duration) and (args.cut is None or abs(e.cut - args.cut) < 1e-9)]
+    if args.cells:
+        want = [tuple(float(x) for x in c.split(":")) for c in args.cells.split("|")]
+        events = [e for e in events if any(e.duration_h == d and abs(e.cut - c) < 1e-9 for d, c in want)]
     predictors = load_predictors(cfg, args.data)
     if args.predictor not in predictors:
         raise SystemExit(f"no predictions/{args.predictor}.csv for --data {args.data}")
+    if args.exp == "acme_e1":                              # step 35: also writes events_/bursts_/fallback_<tag>.csv
+        if args.data != "acme":
+            raise SystemExit("acme_e1 needs --data acme")
+        t0 = time.perf_counter()
+        rows, side = acme_e1(cfg, jobs, pool, events, predictors, args.predictor, args.quick)
+        out = Path(out_dir) / "acme_e1"
+        out.mkdir(parents=True, exist_ok=True)
+        tag = args.tag or "all"
+        pd.DataFrame(rows, columns=COLUMNS).to_csv(out / f"runs_{tag}.csv", index=False)
+        for kind in ("events", "bursts", "fallback"):
+            pd.DataFrame(side[kind]).to_csv(out / f"{kind}_{tag}.csv", index=False)
+        print(f"acme_e1[{tag}]: {len(rows)} rows, {len(side['bursts'])} burst jobs in {time.perf_counter() - t0:.0f} s -> {out}")
+        print("jobs without prediction rows (observed-value fallback):", {d['predictor']: d['jobs_without_rows'] for d in side["fallback"]})
+        return
     t0 = time.perf_counter()
     if args.exp == "e2b":
         baseline_waits(cfg, jobs, pool, out_dir, args.pool)

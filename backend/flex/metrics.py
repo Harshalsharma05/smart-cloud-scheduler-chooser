@@ -146,6 +146,7 @@ def user_impact(base_eng, pol_eng):
         dw += wp - wb
         ds += sp - sb
         n += 1
+    n += base_eng.info.get("n_done_pruned", 0)     # step 35: jobs done before the event, pruned from the snapshot (each adds 0)
     return (dw / n / 60.0, ds / n) if n else (0.0, 0.0)
 
 

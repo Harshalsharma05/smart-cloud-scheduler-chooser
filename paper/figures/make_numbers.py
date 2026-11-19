@@ -354,7 +354,64 @@ def compute():
     for pol in ("mix", "oracle"):
         g = ev[(ev.policy == pol) & (ev.region == "us_east_2")]
         put(f"Ecarbon{cap[pol]}BurstEventsPct", 100 * (g["cloud_kwh_window"] > 0).mean(), "int")
+    acme(M, put, cfg)
     return M
+
+
+def acme(M, put, cfg):
+    """Step 35 (S-A1): Acme Seren macros (prefix Acme), from results/acme_baseline and results/acme_e1. Skipped if absent."""
+    if not (RESULTS / "acme_e1" / "runs.csv").exists():
+        return
+    a = cfg["acme"]
+    put("AcmePoolGpus", a["pool_gpus"], "int")
+    put("AcmeUtil", a["util"], "f2")
+    put("AcmeTargetGpuPowerW", a["target_gpu_power_w"], "int")
+    for k, nm in (("p_idle_w", "PIdleW"), ("p_max_w", "PMaxW"), ("h_idle_w", "HIdleW"), ("h_busy_w", "HBusyW")):
+        put(f"Acme{nm}", a["power"][k], "int")
+    put("AcmePriceGpuH", a["cloud"]["price_per_gpu_h"], "f3")
+    val = pd.read_csv(RESULTS / "acme_baseline" / "validation.csv").set_index("metric")
+    for metric, kind in (("busy_gpus_mean", "int"), ("utilisation_mean", "f2"), ("wait_mean_min", "f1")):
+        put(camel("acme_real_" + metric), val.loc[metric, "real"], kind)
+        put(camel("acme_sim_" + metric), val.loc[metric, "simulated"], kind)
+    r = pd.read_csv(RESULTS / "acme_e1" / "runs.csv", dtype={"selector": str, "predictor": str, "setting": str}).fillna({"predictor": "", "setting": ""})
+    put("AcmeEvents", r["event_id"].nunique(), "int")
+    put("AcmeEventsInfeasible", r.loc[r["feasible"].astype(str) == "False", "event_id"].nunique(), "int")
+    r = r[r["feasible"].astype(str) != "False"]
+
+    def who(x):
+        s = x["setting"]
+        if x["policy"] == "cap":
+            return "cap"
+        if s.startswith("price="):
+            return f"{x['policy']}{'-p90' if 'cq=p90' in s else ''}@{s.split(';')[0][6:]}/{x['predictor']}"
+        if x["policy"] == "mix":
+            return ("nocloud" if "nocloud" in s else "mix-p90" if "cq=p90" in s else "mix") + "/" + x["predictor"]
+        return f"{x['policy']}/{x['predictor']}"
+    r["who"] = r.apply(who, axis=1)
+    dc = in_cell(r, *DEFAULT)
+    med = dc.groupby("who")[["usd_per_mwh", "usd_per_mwh_wfail1", "compliance"]].median()
+    for k, col in USD.items():
+        put(f"AcmeDefDelayUsd{k}", med.loc["delay/transformer", col], "int")
+        put(f"AcmeDefBurstUsd{k}", med.loc["burst/transformer", col], "int")
+        put(f"AcmeDefMixPNineUsd{k}", med.loc["mix-p90/transformer", col], "int")
+    put("AcmeDefCapCompliance", med.loc["cap", "compliance"], "f2")
+    for k, col in W.items():
+        pa = r.pivot_table(index="event_id", columns="who", values=col, aggfunc="first")
+        pdc = dc.pivot_table(index="event_id", columns="who", values=col, aggfunc="first")
+        put(f"AcmeBurstOverDelayDefault{k}", (pdc["burst/transformer"] / pdc["delay/transformer"]).median(), "f1")
+        put(f"AcmeBurstOverDelayAll{k}", (pa["burst/transformer"] / pa["delay/transformer"]).median(), "f1")
+        for p, nm in PRED_NAMES.items():
+            rr, wins, n, tot = ratio_stats(pa[f"mix-p90/{p}"], pa[f"delay/{p}"])
+            put(f"AcmeMixPNineOverDelay{nm}{k}", rr, "f3")
+            put(f"AcmeMixPNineOverDelayCheaper{nm}{k}", wins, "int")
+            put(f"AcmeMixPNineOverDelayEvents{nm}{k}", n, "int")
+            rr, wins, n, _ = ratio_stats(pa[f"mix-p90/{p}"], pa[f"nocloud/{p}"])
+            put(f"AcmeMixOverNocloud{nm}{k}", rr, "f3")
+            put(f"AcmeMixOverNocloudCheaper{nm}{k}", wins, "int")
+        for w in ("burst@1.5/oracle", "burst@1.5/transformer", "mix@1.5/oracle"):
+            if w in pdc:
+                put(camel("acme_cheap_" + w.split("@")[0] + "_" + w.split("/")[1]) + f"OverDelay{k}",
+                    (pdc[w] / pdc["delay/" + w.split("/")[1]]).median(), "f2")
 
 
 def fmt(v, kind):
