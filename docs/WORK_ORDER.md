@@ -125,6 +125,7 @@ does not depend on them.
       check. **Submit by 1 Dec AoE.**
 - [x] **30. [T2] W9 Fixes from the first-draft review** (sensitivity table, cloud price, w_f note, bootstrap CI, no-predictor delay-only, small fixes).
 - [x] **31. [T2] DEMO proof-of-work notebook for the faculty** (`demo/demo.ipynb` + `demo.html`; read-only, re-runs the transformer and one E1 event live).
+- [x] **32. [T1] A1 AcmeTrace loader + characterization** (job traces only; `ml/acme_load.py`, `ml/reports/A1_acme_report.md`). Philly code, data, predictions and results untouched.
 
 ### Writing you can do any time (no Claude Code, with the Track 2 chat)
 
@@ -266,3 +267,4 @@ Claude Code appends one line per finished step (date, step, commit hash, one-lin
 | 2026-11-18 | 31 (DEMO) | b9fe1b2 | demo/demo.ipynb executed top to bottom in 81 s (nbconvert) + demo.html; live transformer on 5 test examples (seed 0) = transformer.csv within 2e-6 (CPU vs GPU); live d2h_c20_0 delay / burst / mix-p90 = results/e1/runs.csv exactly (diff 0); 23 + 6 tests pass, 5 checker OKs; notebook tools installed into ml/.venv (demo/requirements.txt) |
 | 2026-11-18 | Title change | (this commit) | title "Cloud Bursting Rarely Pays for Demand Response in On-Premise GPU Clusters" in main.tex (title, pdftitle), CLAUDE.md, plan headers, paper/README, demo notebook/html; author block "Author(s)"; build 10 pages, 0 overfull, 0 undefined, blind scan 0; overleaf_upload.zip rebuilt (26 files, 0 missing) |
 | 2026-11-18 | Layout fixes | (this commit) | xurl for footnote URLs, footnotes 1-4 ragged-right (stay footnotes, not references); "VIII. Discussion and Limitations" + "IX. Conclusion" (same text); build 10 pages, 0 overfull, 0 undefined, blind scan 0; overleaf_upload.zip rebuilt (26 files, 0 missing) |
+| 2026-11-19 | 32 (A1) | b8c3e79 | acme_jobs.parquet: 470,497 GPU jobs (Seren 450,590, Kalos 19,907); Seren +08:00, Kalos +00:00 (both China-time workloads); Failed+Killed = 78.8% / 68.1% of GPU-h vs Philly 66.9%; >12 h jobs hold 52% / 57% of running GPUs at 17-20h vs Philly 87%; max 1,024 GPUs; power = CDF curves only (idle ~63 W, p90 ~400 W) |
