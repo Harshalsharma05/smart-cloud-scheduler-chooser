@@ -16,6 +16,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402
+import dataset as D  # noqa: E402
 import model as M  # noqa: E402
 
 
@@ -44,6 +45,7 @@ def evaluate(net, d, bs, amp):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", required=True)
+    ap.add_argument("--dataset", default="philly", choices=["philly", "acme"])
     ap.add_argument("--epochs", type=int, default=30)
     ap.add_argument("--batch", type=int, default=512)
     ap.add_argument("--lr", type=float, default=1e-3)
@@ -61,16 +63,18 @@ def main():
     run_dir = Path(args.out) / args.name
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    ex = pd.read_parquet(Path(args.data) / "ml_examples.parquet")
-    jobs = pd.read_parquet(Path(args.data) / "philly_jobs.parquet")
+    ds = D.get(args.dataset)
+    ex = pd.read_parquet(D.examples_path(ds, args.data))
+    jobs = D.load_jobs(ds, args.data)
     vc_map = M.vc_index(jobs)
+    feat = M.feat_for(ds, jobs)
     tr, va = ex[ex["split"] == "train"], ex[ex["split"] == "val"]
     if args.max_rows:
         tr = tr.sample(n=min(args.max_rows, len(tr)), random_state=args.seed)
         va = va.sample(n=min(max(args.max_rows // 4, 1), len(va)), random_state=args.seed)
-    dtr, dva = M.build_tensors(tr, jobs, vc_map, device), M.build_tensors(va, jobs, vc_map, device)
+    dtr, dva = M.build_tensors(tr, jobs, vc_map, device, feat), M.build_tensors(va, jobs, vc_map, device, feat)
 
-    net = M.HistoryTransformer(n_vc=len(vc_map)).to(device)
+    net = M.make_net(len(vc_map), feat).to(device)
     n_params = sum(p.numel() for p in net.parameters())
     opt = torch.optim.AdamW(net.parameters(), lr=args.lr)
     scaler = torch.amp.GradScaler(enabled=args.amp and device.type == "cuda")
@@ -103,7 +107,7 @@ def main():
                         "seconds": epoch_times[-1]})
         print(f"epoch {epoch:2d} | train {train_loss:.4f} | val {v_tot:.4f} (pinball {v_pin:.4f}, ce {v_ce:.4f}) | {epoch_times[-1]:.1f}s", flush=True)
 
-        ckpt = {"state_dict": net.state_dict(), "n_vc": len(vc_map), "vc_map": vc_map, "epoch": epoch, "val_loss": v_tot}
+        ckpt = {"state_dict": net.state_dict(), "n_vc": len(vc_map), "vc_map": vc_map, "feat": feat, "epoch": epoch, "val_loss": v_tot}
         torch.save(ckpt, run_dir / f"epoch_{epoch:02d}.pt")
         if v_tot < best:
             best, bad = v_tot, 0

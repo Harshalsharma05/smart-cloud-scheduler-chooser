@@ -13,14 +13,15 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402
+import dataset as D  # noqa: E402
 import model as M  # noqa: E402
 from export_simple import COLS  # noqa: E402
 
 
 @torch.no_grad()
-def predict_frame(net, ex, jobs, vc_map, device, bs=2048):
+def predict_frame(net, ex, jobs, vc_map, device, bs=2048, feat=None):
     """ex: example rows (any split) -> DataFrame with the contract columns."""
-    d = M.build_tensors(ex, jobs, vc_map, device)
+    d = M.build_tensors(ex, jobs, vc_map, device, feat)
     net.eval()
     qs, ps = [], []
     for i in range(0, len(ex), bs):
@@ -39,6 +40,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", required=True, help="run name under runs/")
     ap.add_argument("--ckpt", default="best.pt")
+    ap.add_argument("--dataset", default="philly", choices=["philly", "acme"])
     ap.add_argument("--split", default="val", choices=["train", "val", "test"])
     ap.add_argument("--out", required=True)
     ap.add_argument("--data", default=str(config.DATA_PROCESSED))
@@ -47,12 +49,14 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = torch.load(Path(args.runs) / args.run / args.ckpt, map_location=device)
-    net = M.HistoryTransformer(n_vc=ckpt["n_vc"]).to(device)
+    feat = ckpt.get("feat", M.PHILLY_FEAT)
+    net = M.make_net(ckpt["n_vc"], feat).to(device)
     net.load_state_dict(ckpt["state_dict"])
-    ex = pd.read_parquet(Path(args.data) / "ml_examples.parquet")
-    jobs = pd.read_parquet(Path(args.data) / "philly_jobs.parquet")
+    ds = D.get(args.dataset)
+    ex = pd.read_parquet(D.examples_path(ds, args.data))
+    jobs = D.load_jobs(ds, args.data)
     ex = ex[ex["split"] == args.split]
-    df = predict_frame(net, ex, jobs, ckpt["vc_map"], device)
+    df = predict_frame(net, ex, jobs, ckpt["vc_map"], device, feat=feat)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     df.sort_values(["job_id", "elapsed_s"]).to_csv(args.out, index=False)
     print(f"wrote {len(df):,} rows ({args.split}) to {args.out}")

@@ -9,6 +9,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402
+import dataset as D  # noqa: E402
 from export_simple import COLS, export_keys  # noqa: E402
 
 
@@ -36,9 +37,10 @@ def check(path):
     if dup.any():
         probs.append(f"{int(dup.sum())} duplicate (job_id, elapsed_s) keys")
 
-    ex = pd.read_parquet(config.DATA_PROCESSED / "ml_examples.parquet", columns=["job_id", "elapsed_s", "split"])
-    jobs = pd.read_parquet(config.DATA_PROCESSED / "philly_jobs.parquet")
-    expected = set(map(tuple, export_keys(jobs, ex)[["job_id", "elapsed_s"]].to_numpy()))
+    ds = D.from_path(path)  # acme_<name>.csv -> Acme key set, otherwise Philly
+    ex = pd.read_parquet(D.examples_path(ds), columns=["job_id", "elapsed_s", "split"])
+    jobs = D.load_jobs(ds)
+    expected = set(map(tuple, export_keys(jobs, ex, ds)[["job_id", "elapsed_s"]].to_numpy()))
     got = set(map(tuple, df[["job_id", "elapsed_s"]].to_numpy()))
     missing, extra = expected - got, got - expected
     if missing:

@@ -2,6 +2,7 @@
 
 Run from the repo root:  ml\\.venv\\Scripts\\python ml\\export_simple.py
 """
+import argparse
 import sys
 from pathlib import Path
 
@@ -20,16 +21,17 @@ def valid_mask(jobs):
     return (~jobs["never_started"]) & (~jobs["censored"]) & (jobs["wall_s"].astype("float64") > 0) & (jobs["num_gpus"] > 0)
 
 
-def export_jobs(jobs):
-    """Valid jobs overlapping [SIM_START, TEST_END): end_time > SIM_START and submit_time < TEST_END."""
-    m = (valid_mask(jobs) & (jobs["end_time"].astype("float64") > utc_epoch(config.SIM_START))
-         & (jobs["submit_time"].astype("float64") < utc_epoch(config.TEST_END)))
+def export_jobs(jobs, ds=None):
+    """Valid jobs overlapping [SIM_START, TEST_END): end_time > SIM_START and submit_time < TEST_END (dataset ds, default Philly)."""
+    sim_start, test_end = (ds.sim_start, ds.test_end) if ds else (config.SIM_START, config.TEST_END)
+    m = (valid_mask(jobs) & (jobs["end_time"].astype("float64") > utc_epoch(sim_start))
+         & (jobs["submit_time"].astype("float64") < utc_epoch(test_end)))
     return jobs[m]
 
 
-def export_keys(jobs, ex):
+def export_keys(jobs, ex, ds=None):
     """The ml_examples rows (any split) of the export jobs: the key set of every prediction file."""
-    return ex[ex["job_id"].isin(export_jobs(jobs)["job_id"])]
+    return ex[ex["job_id"].isin(export_jobs(jobs, ds)["job_id"])]
 
 
 def oracle_frame(ex):
@@ -60,19 +62,21 @@ def train_fallbacks(ex):
 
 
 def main():
-    jobs = pd.read_parquet(config.DATA_PROCESSED / "philly_jobs.parquet")
-    ex = pd.read_parquet(config.DATA_PROCESSED / "ml_examples.parquet")
+    import dataset as D
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default="philly", choices=["philly", "acme"])
+    ds = D.get(ap.parse_args().dataset)
+    jobs = D.load_jobs(ds)
+    ex = pd.read_parquet(D.examples_path(ds))
     config.PREDICTIONS.mkdir(parents=True, exist_ok=True)
-
-    keys = export_keys(jobs, ex)
+    keys = export_keys(jobs, ex, ds)
 
     fw, ff, fc = train_fallbacks(ex)
     outs = {"oracle": oracle_frame(keys), "last2": last2_frame(keys, fw, ff, fc)}
     for name, df in outs.items():
         df = df.sort_values(["job_id", "elapsed_s"]).reset_index(drop=True)[COLS]
-        df.to_csv(config.PREDICTIONS / f"{name}.csv", index=False)
-        print(f"{name}: {len(df):,} rows, {df['job_id'].nunique():,} distinct jobs")
-
+        df.to_csv(D.pred_path(ds, name), index=False)
+        print(f"{ds.prefix}{name}: {len(df):,} rows, {df['job_id'].nunique():,} distinct jobs")
     print("export rows per split:", keys["split"].value_counts().to_dict())
     print("export jobs per split:", keys.drop_duplicates("job_id")["split"].value_counts().to_dict())
     print(f"last2 train fallbacks: median wall {fw:.0f} s, fail {ff:.3f}, cancel {fc:.3f}; "

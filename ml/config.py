@@ -23,3 +23,11 @@ SIM_START = "2017-11-08"     # Track 2 simulation window is [SIM_START, TEST_END
 
 SEED = 0
 STATUS_LOSS_WEIGHT = 1.0     # total loss = pinball + weight * CE
+
+# Acme (Seren only), A2. Boundaries are China-time (UTC+8) midnights, stored as UTC strings. Half-open, by submit_time.
+ACME_TRAIN_END = "2023-06-14 16:00"   # = 2023-06-15 00:00 China time
+ACME_VAL_START = ACME_TRAIN_END
+ACME_VAL_END = "2023-06-28 16:00"     # = 2023-06-29 00:00 China time
+ACME_TEST_START = ACME_VAL_END
+ACME_TEST_END = "2023-07-29 16:00"    # = 2023-07-30 00:00 China time
+ACME_SIM_START = "2023-06-21 16:00"   # = 2023-06-22 00:00 China time

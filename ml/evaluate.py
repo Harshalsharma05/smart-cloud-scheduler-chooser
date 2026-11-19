@@ -19,6 +19,7 @@ import config  # noqa: E402
 STATUSES = ["Pass", "Failed", "Killed"]
 QS = (0.1, 0.5, 0.9)
 EPS = 1e-15
+EXTRA = ["mae_log", "auroc_cancel"]  # added for Acme (A2); Philly's T4 tables do not have them
 METRICS = ["n", "pinball", "mae_p50_min", "coverage_p10_p90", "logloss", "auroc_failed", "brier_pfail"]
 
 
@@ -61,7 +62,17 @@ def brier_pfail(status, p_fail):
     return float(np.mean((np.asarray(p_fail) - (np.asarray(status) == 1)) ** 2))
 
 
-def all_metrics(remaining_s, status, pred, runtime=True):
+def mae_log(y, p50):
+    """Mean absolute error of the p50 in log1p space."""
+    return float(np.mean(np.abs(np.log1p(np.asarray(p50)) - np.log1p(y))))
+
+
+def auroc_cancel(status, p_cancel):
+    y = (np.asarray(status) == 2).astype(int)
+    return float(roc_auc_score(y, p_cancel)) if 0 < y.sum() < len(y) else float("nan")
+
+
+def all_metrics(remaining_s, status, pred, runtime=True, extra=False):
     """remaining_s, status (0/1/2 ids): arrays; pred: DataFrame with the contract columns. Runtime metrics skipped if not runtime."""
     y = target_rt(remaining_s)
     out = {"n": len(y)}
@@ -74,6 +85,9 @@ def all_metrics(remaining_s, status, pred, runtime=True):
     out["logloss"] = logloss3(status, pred["p_fail"].to_numpy(), pred["p_cancel"].to_numpy())
     out["auroc_failed"] = auroc_failed(status, pred["p_fail"].to_numpy())
     out["brier_pfail"] = brier_pfail(status, pred["p_fail"].to_numpy())
+    if extra:
+        out["mae_log"] = mae_log(y, pred["rt_p50_s"].to_numpy()) if runtime else np.nan
+        out["auroc_cancel"] = auroc_cancel(status, pred["p_cancel"].to_numpy())
     return out
 
 
@@ -104,48 +118,62 @@ def md_table(df, floats=3):
     return "\n".join(L)
 
 
-def build_predictions(ex_export, jobs, ex_all):
-    """name -> contract frame aligned with ex_export rows, for the 5 predictors."""
+def build_predictions(ex_export, jobs, ex_all, ds=None):
+    """name -> contract frame aligned with ex_export rows, for the 5 predictors (+ Acme's no-type lightgbm ablation)."""
     import torch
 
     import baselines as B
+    import dataset as D
     import export_simple as S
     import model as M
     import predict as P
 
-    vc_map = B.__dict__.get("vc_map") or {v: i for i, v in enumerate(sorted(jobs["vc"].unique()))}
+    ds = ds or D.PHILLY
+    vc_map = {v: i for i, v in enumerate(sorted(jobs["vc"].unique()))}
     preds = {"oracle": S.oracle_frame(ex_export)}
     fw, ff, fc = S.train_fallbacks(ex_all)
     preds["last2"] = S.last2_frame(ex_export, fw, ff, fc)
-    for name in ("gbdt", "lightgbm"):
-        preds[name] = B.predict_frame(name, B.load_models(name), ex_export, vc_map)
+    names = ["gbdt", "lightgbm"] + (["lightgbm_notype"] if ds.name == "acme" else [])
+    for name in names:
+        run = ds.prefix + name
+        feats, types = B.load_spec(run)
+        preds[name] = B.predict_frame(run, B.load_models(run), ex_export, vc_map, feats, types)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    ckpt = torch.load(config.RUNS / "tf_v1" / "best.pt", map_location=device)
-    net = M.HistoryTransformer(n_vc=ckpt["n_vc"]).to(device)
+    ckpt = torch.load(config.RUNS / (ds.prefix + "tf_v1") / "best.pt", map_location=device)
+    feat = ckpt.get("feat", M.PHILLY_FEAT)
+    net = M.make_net(ckpt["n_vc"], feat).to(device)
     net.load_state_dict(ckpt["state_dict"])
-    preds["transformer"] = P.predict_frame(net, ex_export, jobs, ckpt["vc_map"], device)
+    preds["transformer"] = P.predict_frame(net, ex_export, jobs, ckpt["vc_map"], device, feat=feat)
     for k, df in preds.items():
         assert (df["job_id"].to_numpy() == ex_export["job_id"].to_numpy()).all(), k
     return preds
 
 
 def main():
+    import argparse
+
+    import dataset as D
     import export_simple as S
 
-    ex = pd.read_parquet(config.DATA_PROCESSED / "ml_examples.parquet")
-    jobs = pd.read_parquet(config.DATA_PROCESSED / "philly_jobs.parquet")
-    exp = S.export_keys(jobs, ex).reset_index(drop=True)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default="philly", choices=["philly", "acme"])
+    ds = D.get(ap.parse_args().dataset)
+    acme = ds.name == "acme"
+    ex = pd.read_parquet(D.examples_path(ds))
+    jobs = D.load_jobs(ds)
+    exp = S.export_keys(jobs, ex, ds).reset_index(drop=True)
     print(f"export rows {len(exp):,}: {exp['split'].value_counts().to_dict()}")
-    preds = build_predictions(exp, jobs, ex)
+    preds = build_predictions(exp, jobs, ex, ds)
     status = exp["status"].map({s: i for i, s in enumerate(STATUSES)}).to_numpy()
     rem = exp["remaining_s"].to_numpy()
     train = ex[ex["split"] == "train"]
     prior = prior_frame(train, exp)
-    order = ["last2", "gbdt", "lightgbm", "transformer", "oracle", "prior"]
+    order = ["last2", "gbdt", "lightgbm", "transformer", "oracle", "prior"] + (["lightgbm_notype"] if acme else [])
     frames = {**preds, "prior": prior}
 
     def run(mask, name):
-        return all_metrics(rem[mask], status[mask], frames[name][mask] if name != "prior" else prior[mask], runtime=name != "prior")
+        return all_metrics(rem[mask], status[mask], frames[name][mask] if name != "prior" else prior[mask], runtime=name != "prior",
+                           extra=acme)
 
     # headline: test split, overall and per grid point
     is_test = (exp["split"] == "test").to_numpy()
@@ -160,19 +188,23 @@ def main():
 
     # per split on the export rows, learned models (+ references)
     rows2 = []
-    for name in ["last2", "gbdt", "lightgbm", "transformer", "prior"]:
+    for name in [n for n in order if n not in ("oracle",)]:
         for sp in ("train", "val", "test"):
             m = (exp["split"] == sp).to_numpy()
-            rows2.append({"predictor": name, "split": sp, **run(m, name)})
+            if m.any():
+                rows2.append({"predictor": name, "split": sp, **run(m, name)})
     by_split = table(rows2)
 
     out = config.RESULTS
     out.mkdir(parents=True, exist_ok=True)
-    head.to_csv(out / "predictor_metrics.csv", index=False)
-    by_split.to_csv(out / "predictor_metrics_by_split.csv", index=False)
+    pre = ds.prefix
+    head.to_csv(out / f"{pre}predictor_metrics.csv", index=False)
+    by_split.to_csv(out / f"{pre}predictor_metrics_by_split.csv", index=False)
     overall = head[head["elapsed_s"] == "all"].drop(columns="elapsed_s")
-    L = ["# Predictor metrics (T4)", "",
-         "Test split only (submitted 2017-11-15 to 2017-12-15). Runtime metrics are on remaining runtime floored at 60 s; "
+    window = ("Acme Seren, test split only (submitted 2023-06-29 to 2023-07-29, China time)" if acme
+              else "Test split only (submitted 2017-11-15 to 2017-12-15)")
+    L = [f"# Predictor metrics ({'A2, Acme' if acme else 'T4'})", "",
+         f"{window}. Runtime metrics are on remaining runtime floored at 60 s; "
          "pinball is the mean over q10/q50/q90 in log1p space; coverage target is 0.80. `prior` is the train-split class "
          "frequency per grid point (status metrics only). `oracle` uses ground truth. Nothing was tuned on test.", "",
          "## Overall (test)", "", md_table(overall), "",
@@ -182,7 +214,7 @@ def main():
     L += ["## Export rows by split (train = in-sample, val = used for early stopping, test = clean)", "",
           "The train and val rows flatter the learned models; only test is a fair estimate. `last2` and `prior` use no trained "
           "parameters beyond the train-split fallbacks.", "", md_table(by_split), ""]
-    (out / "predictor_metrics.md").write_text("\n".join(L), encoding="utf-8")
+    (out / f"{pre}predictor_metrics.md").write_text("\n".join(L), encoding="utf-8")
     print(md_table(overall))
     print()
     print(md_table(by_split))

@@ -107,6 +107,8 @@ def build_examples(jobs, attempts, bounds=None, grid=None, H=None):
     ex.insert(0, "job_id", job_ids[r])
     ex["user"] = users[r]
     ex["vc"] = pd.Categorical(jobs["vc"].to_numpy()[r])
+    if "type" in jobs.columns:  # Acme workload type (not in Philly)
+        ex["type"] = pd.Categorical(jobs["type"].to_numpy()[r])
     ex["num_gpus"] = ngpu[r]
     ex["submit_hour"] = sub_ts.hour.to_numpy()
     ex["submit_dow"] = sub_ts.day_of_week.to_numpy()
@@ -152,14 +154,21 @@ def write_report(ex, jobs, n_candidates, path):
 
 
 def main():
-    jobs = pd.read_parquet(config.DATA_PROCESSED / "philly_jobs.parquet")
-    attempts = pd.read_parquet(config.DATA_PROCESSED / "philly_attempts.parquet")
-    ex = build_examples(jobs, attempts)
-    ex.to_parquet(config.DATA_PROCESSED / "ml_examples.parquet", index=False)
-    b = default_bounds()
-    n_cand = int(((~jobs["never_started"]) & (~jobs["censored"]) & (jobs["submit_time"] < b["test_end"])).sum())
-    write_report(ex, jobs, n_cand, config.REPORTS / "T2_examples_report.md")
-    print(f"{len(ex):,} rows -> {config.DATA_PROCESSED / 'ml_examples.parquet'}")
+    import argparse
+
+    import dataset as D
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default="philly", choices=["philly", "acme"])
+    ds = D.get(ap.parse_args().dataset)
+    jobs, attempts = D.load_jobs(ds), D.load_attempts(ds)
+    ex = build_examples(jobs, attempts, bounds=ds.bounds)
+    out = D.examples_path(ds)
+    ex.to_parquet(out, index=False)
+    if ds.name == "philly":
+        b = default_bounds()
+        n_cand = int(((~jobs["never_started"]) & (~jobs["censored"]) & (jobs["submit_time"] < b["test_end"])).sum())
+        write_report(ex, jobs, n_cand, config.REPORTS / "T2_examples_report.md")
+    print(f"{len(ex):,} rows -> {out}")
     print(ex["split"].value_counts().to_dict())
 
 
