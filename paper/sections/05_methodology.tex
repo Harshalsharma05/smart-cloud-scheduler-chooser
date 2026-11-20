@@ -9,8 +9,8 @@ The simulation starts on 8~November, so the seven days before the test window ar
 Baseline statistics count only the \MotTestJobs{} test jobs. The cost of a policy is the paired difference over all jobs.
 
 \subsection{Pool and baseline check}
-The trace lists \MethMachines{} machines; counting the GPU columns of each machine in the utilisation file gives \SetupInstalledGpus{} installed GPUs. In the test window only about \SetupPoolGpus{} of them report a utilisation value in a typical minute. We treat the others as unavailable and simulate a pool of \SetupPoolGpus{} GPUs, the median number of reporting GPUs.
-Table~\ref{tab:baseline} compares the simulated baseline with the trace. Busy GPUs and utilisation match. Waits do not: the simulated mean wait is shorter and its 90th percentile is longer. The simulator has no virtual-cluster quotas, no placement constraints and no start-up delay. We did not tune it to match the waits.
+The trace has \SetupInstalledGpus{} installed GPUs, of which about \SetupPoolGpus{} report a utilisation value in a typical test-window minute; we simulate a pool of \SetupPoolGpus{} GPUs.
+Table~\ref{tab:baseline} compares the simulated baseline with the trace. Busy GPUs and utilisation match; waits do not, because the simulator has no virtual-cluster quotas, placement constraints or start-up delay. We did not tune it to match the waits.
 
 \begin{table}[t]
 \centering
