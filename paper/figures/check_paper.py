@@ -125,6 +125,13 @@ for f in TEX + [P / "numbers.tex"]:
         if re.search(r"[0-9]%", l):
             haz += 1
             print(f"   {rel}:{i}: unescaped % after a number (comments out the rest of the line): {l.strip()[:90]}")
+    # W13: control bytes other than LF, TAB and the CR of CRLF (e.g. a "\r" of "\ref" turned into a carriage return by a
+    # non-raw Python string); LaTeX drops them silently and prints "ef{...}" instead of the reference
+    data = f.read_bytes()
+    for k, c in enumerate(data):
+        if c < 0x20 and c not in (0x0A, 0x09) and not (c == 0x0D and data[k + 1:k + 2] == b"\n"):
+            haz += 1
+            print(f"   {rel}: control byte 0x{c:02X} at byte {k}: {data[max(0, k - 30):k + 15]!r}")
     s = strip_comments(raw)
     if len(re.findall(UNESC + r"\$", s)) % 2:
         haz += 1
