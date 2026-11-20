@@ -43,15 +43,6 @@
   doi = {10.1145/1551609.1551635}
 }
 
-@inproceedings{bicer12,
-  author = {Bicer, Tekin and Chiu, David and Agrawal, Gagan},
-  title = {Time and Cost Sensitive Data-Intensive Computing on Hybrid Clouds},
-  booktitle = {2012 12th {IEEE}/{ACM} International Symposium on Cluster, Cloud and Grid Computing ({CCGrid} 2012)},
-  year = {2012},
-  pages = {636--643},
-  doi = {10.1109/ccgrid.2012.95}
-}
-
 @inproceedings{clemente17,
   author = {Clemente-Castello, Francisco J. and Mayo, Rafael and Fernandez, Juan Carlos},
   title = {Cost Model and Analysis of Iterative {MapReduce} Applications for Hybrid Cloud Bursting},
@@ -59,15 +50,6 @@
   year = {2017},
   pages = {858--864},
   doi = {10.1109/ccgrid.2017.146}
-}
-
-@inproceedings{chung18,
-  author = {Chung, Andrew and Park, Jun Woo and Ganger, Gregory R.},
-  title = {{Stratus}: cost-aware container scheduling in the public cloud},
-  booktitle = {Proceedings of the {ACM} Symposium on Cloud Computing},
-  year = {2018},
-  pages = {121--134},
-  doi = {10.1145/3267809.3267819}
 }
 
 @inproceedings{chang25,
@@ -212,13 +194,97 @@
   year = {2017}
 }
 
-@article{mualem01,
-  author = {Mu'alem, A.W. and Feitelson, D.G.},
-  title = {Utilization, predictability, workloads, and user runtime estimates in scheduling the {IBM SP2} with backfilling},
-  journal = {{IEEE} Transactions on Parallel and Distributed Systems},
-  volume = {12},
-  number = {6},
-  year = {2001},
-  pages = {529--543},
-  doi = {10.1109/71.932708}
+% mualem01 (Mu'alem and Feitelson, TPDS 2001) removed in W11 for the page limit.
+}
+
+% ---- W10 (inside step 36, 2026-11-20). Each entry from the official page: usenix.org BibTeX (hu24, yang23, wu24, li26),
+% dl.acm.org article page (acun26dr, zhao23, chung24, stojkovic25tapas), ieeexplore.ieee.org + IEEE CSDL page numbers
+% (stojkovic25dynamo), nature.com citation metadata (colangelo26). chung18 (Stratus) -> yang23; bicer12 -> wu24.
+
+@inproceedings{hu24,
+  author = {Qinghao Hu and Zhisheng Ye and Zerui Wang and Guoteng Wang and Meng Zhang and Qiaoling Chen and Peng Sun and Dahua Lin and Xiaolin Wang and Yingwei Luo and Yonggang Wen and Tianwei Zhang},
+  title = {Characterization of Large Language Model Development in the Datacenter},
+  booktitle = {21st {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 24)},
+  year = {2024},
+  pages = {709--729}
+}
+
+@article{colangelo26,
+  author = {Colangelo, Philip and Coskun, Ayse K. and Megrue, Jack and Roberts, Ciaran and Sengupta, Shayan and Sivaram, Varun and Tiao, Ethan and Vijaykar, Aroon and Williams, Chris and Wilson, Daniel C. and Records, Brandon and MacFarland, Zack and Dreiling, Daniel and Morey, Nathan and Ratnayake, Anuja and Vairamohan, Baskar},
+  title = {{AI} data centres as grid-interactive assets},
+  journal = {Nature Energy},
+  volume = {11},
+  number = {2},
+  pages = {254--261},
+  year = {2026},
+  doi = {10.1038/s41560-025-01927-1}
+}
+
+@inproceedings{acun26dr,
+  author = {Acun, Fatih and Hankendi, Can and Levine, Ethan and Reynolds, Hudson and Bardwick, Joshua and Coskun, Ayse K.},
+  title = {Investigating Power Consumption Flexibility of {AI} Data Centers for Demand Response Participation},
+  booktitle = {Proceedings of the 17th {ACM} International Conference on Future and Sustainable Energy Systems},
+  year = {2026},
+  pages = {344--348},
+  doi = {10.1145/3744255.3798112}
+}
+
+@inproceedings{zhao23,
+  author = {Zhao, Dan and Samsi, Siddharth and McDonald, Joseph and Li, Baolin and Bestor, David and Jones, Michael and Tiwari, Devesh and Gadepally, Vijay},
+  title = {Sustainable Supercomputing for {AI}: {GPU} Power Capping at {HPC} Scale},
+  booktitle = {Proceedings of the 2023 {ACM} Symposium on Cloud Computing},
+  year = {2023},
+  pages = {588--596},
+  doi = {10.1145/3620678.3624793}
+}
+
+@inproceedings{chung24,
+  author = {Chung, Jae-Won and Gu, Yile and Jang, Insu and Meng, Luoxi and Bansal, Nikhil and Chowdhury, Mosharaf},
+  title = {Reducing Energy Bloat in Large Model Training},
+  booktitle = {Proceedings of the {ACM} {SIGOPS} 30th Symposium on Operating Systems Principles},
+  year = {2024},
+  pages = {144--159},
+  doi = {10.1145/3694715.3695970}
+}
+
+@inproceedings{stojkovic25dynamo,
+  author = {Stojkovic, Jovan and Zhang, Chaojie and Goiri, {\'I}{\~n}igo and Torrellas, Josep and Choukse, Esha},
+  title = {{DynamoLLM}: Designing {LLM} Inference Clusters for Performance and Energy Efficiency},
+  booktitle = {2025 {IEEE} International Symposium on High Performance Computer Architecture ({HPCA})},
+  year = {2025},
+  pages = {1348--1362},
+  doi = {10.1109/HPCA61900.2025.00102}
+}
+
+@inproceedings{stojkovic25tapas,
+  author = {Stojkovic, Jovan and Zhang, Chaojie and Goiri, {\'I}{\~n}igo and Choukse, Esha and Qiu, Haoran and Fonseca, Rodrigo and Torrellas, Josep and Bianchini, Ricardo},
+  title = {{TAPAS}: Thermal- and Power-Aware Scheduling for {LLM} Inference in Cloud Platforms},
+  booktitle = {Proceedings of the 30th {ACM} International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 2},
+  year = {2025},
+  pages = {1266--1281},
+  doi = {10.1145/3676641.3716025}
+}
+
+@inproceedings{yang23,
+  author = {Zongheng Yang and Zhanghao Wu and Michael Luo and Wei-Lin Chiang and Romil Bhardwaj and Woosuk Kwon and Siyuan Zhuang and Frank Sifei Luan and Gautam Mittal and Scott Shenker and Ion Stoica},
+  title = {{SkyPilot}: An Intercloud Broker for Sky Computing},
+  booktitle = {20th {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 23)},
+  year = {2023},
+  pages = {437--455}
+}
+
+@inproceedings{wu24,
+  author = {Zhanghao Wu and Wei-Lin Chiang and Ziming Mao and Zongheng Yang and Eric Friedman and Scott Shenker and Ion Stoica},
+  title = {Can't Be Late: Optimizing Spot Instance Savings under Deadlines},
+  booktitle = {21st {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 24)},
+  year = {2024},
+  pages = {185--203}
+}
+
+@inproceedings{li26,
+  author = {Suyi Li and Lingyun Yang and Haoxuan Yu and Sheng Yao and Tianyuan Wu and Xiaoxiao Jiang and Hanfeng Lu and Kangjin Wang and Chenhao Wang and Shenglin Xu and Lun Wang and Qingyang Duan and Shenghao Liang and Xiu Lin and Meng Zhang and Wenchao Wu and Yinghao Yu and Guodong Yang and Liping Zhang and Wei Wang},
+  title = {Heterogeneity at Hyperscale: Characterization and Scheduling of Large Production {AI} Clusters at {Alibaba}},
+  booktitle = {20th {USENIX} Symposium on Operating Systems Design and Implementation ({OSDI} 26)},
+  year = {2026},
+  pages = {2187--2203}
 }

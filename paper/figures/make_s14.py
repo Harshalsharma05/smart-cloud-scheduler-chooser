@@ -80,7 +80,35 @@ def paired(df):
     return pd.DataFrame(rows)
 
 
-def f8(df, name="f8_selectors"):
+def f8_single(d, rules, order, y, name):
+    """W11 (page budget): panel (a) of F8 only, one column wide (cost per MWh by selector, contract faded, hold solid)."""
+    from matplotlib.patches import Patch
+    fig, ax = plt.subplots(figsize=(WIDTH_IN, 2.15), constrained_layout=True)
+    h = 0.8 / (2 * len(rules))
+    for i, pol in enumerate(("burst", "mix")):
+        for k, rule in enumerate(rules):
+            v = [d[(d["rule"] == rule) & (d["policy"] == pol) & (d["sel"] == s)]["usd_per_mwh"].median() / 1000 for s in order]
+            fade = rule == "contract" and len(rules) > 1
+            ax.barh(y - 0.4 + h * (2 * i + k + 0.5), v, h, color=COLORS[pol], alpha=0.4 if fade else 1.0, edgecolor=COLORS[pol], lw=0.6)
+    ax.set_xscale("log")
+    ax.set_xlabel("median cost, k$/MWh shed", fontsize=7)
+    ax.tick_params(labelsize=6.5)
+    ax.grid(axis="x", lw=0.3, color="0.8")
+    ax.set_axisbelow(True)
+    names = {"last2": "last-two-jobs", "gbdt": "gradient-boosted trees", "lightgbm": "LightGBM"}
+    ax.set_yticks(y, [names.get(o, o) for o in order])
+    ax.invert_yaxis()
+    handles = [Patch(color=COLORS["burst"], label="burst"), Patch(color=COLORS["mix"], label="mix")]
+    if len(rules) > 1:
+        handles += [Patch(facecolor="0.6", alpha=0.4, edgecolor="black", label="contract (faded)"), Patch(facecolor="0.4", edgecolor="black", label="hold (solid)")]
+    ax.legend(handles=handles, loc="lower center", bbox_to_anchor=(0.4, 1.0), frameon=False, fontsize=6, ncol=4,
+              handlelength=1.2, columnspacing=0.8)
+    path = save(fig, name)
+    fig.savefig(path.with_suffix(".png"), dpi=200)
+    plt.close(fig)
+
+
+def f8(df, name="f8_selectors", single=False):
     """F8 selector comparison, default cell, p50 variants. df may have a 'rule' column (contract / hold): the contract rule is drawn
     as faded, outlined bars next to the solid hold bars. Grey-print safe: stack components differ in grey level and hatch."""
     from matplotlib.patches import Patch
@@ -90,6 +118,8 @@ def f8(df, name="f8_selectors"):
     rules = [r for r in ("contract", "hold") if r in set(d["rule"])]
     order = ["none-largest", "random"] + PREDS
     y = np.arange(len(order))
+    if single:
+        return f8_single(d, rules, order, y, name)
     fig, axes = plt.subplots(1, 3, figsize=(2 * WIDTH_IN, 2.6), sharey=True)
     fig.subplots_adjust(left=0.12, right=0.99, top=0.90, bottom=0.34, wspace=0.08)
     h = 0.8 / (2 * len(rules))

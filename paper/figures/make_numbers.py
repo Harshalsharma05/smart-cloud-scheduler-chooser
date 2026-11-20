@@ -120,6 +120,7 @@ def compute():
         p_all, p_def = piv(e1, col), piv(dc, col)
         put(f"BurstOverDelayDefault{k}", (p_def["burst"] / p_def["delay"]).median(), "int")           # per-event median, default cell
         put(f"BurstOverDelayAll{k}", (p_all["burst"] / p_all["delay"]).median(), "int")               # per-event median, all feasible events
+        put(f"BurstCheaperThanDelay{k}", int((p_all["burst"] < p_all["delay"] - 1e-9).sum()), "int")  # W11: events where burst-only beats delay
         for who, nm in (("mix-p90", "MixPNine"), ("mix", "Mix"), ("mix (last2)", "MixLastTwo"), ("mix+oracle", "MixOracle")):
             base = {"mix (last2)": "delay (last2)", "mix+oracle": "delay+oracle"}.get(who, "delay")
             r, wins, n, tot = ratio_stats(p_all[who], p_all[base])
@@ -412,6 +413,56 @@ def acme(M, put, cfg):
             if w in pdc:
                 put(camel("acme_cheap_" + w.split("@")[0] + "_" + w.split("/")[1]) + f"OverDelay{k}",
                     (pdc[w] / pdc["delay/" + w.split("/")[1]]).median(), "f2")
+        # step 36 (W11): ranges over the learned predictors, burst-cheaper counts, the $4.10 sensitivity
+        learned = ("gbdt", "lightgbm", "transformer")
+        mp = [ratio_stats(pa[f"mix-p90/{p}"], pa[f"delay/{p}"]) for p in learned]
+        put(f"AcmeLearnedMixMin{k}", min(x[0] for x in mp), "f3")
+        put(f"AcmeLearnedMixMax{k}", max(x[0] for x in mp), "f3")
+        put(f"AcmeLearnedMixCheaperMin{k}", min(x[1] for x in mp), "int")
+        put(f"AcmeLearnedMixCheaperMax{k}", max(x[1] for x in mp), "int")
+        m5 = [ratio_stats(pa[f"mix/{p}"], pa[f"delay/{p}"])[0] for p in learned]
+        put(f"AcmeLearnedMixPFiveMin{k}", min(m5), "f1")
+        put(f"AcmeLearnedMixPFiveMax{k}", max(m5), "f1")
+        nc = [ratio_stats(pa[f"mix-p90/{p}"], pa[f"nocloud/{p}"])[0] for p in learned]
+        put(f"AcmeLearnedNocloudMin{k}", min(nc), "f3")
+        put(f"AcmeLearnedNocloudMax{k}", max(nc), "f3")
+        bc = [int((pa[f"burst/{p}"] < pa[f"delay/{p}"] - 1e-9).sum()) for p in learned]
+        put(f"AcmeLearnedBurstCheaperMax{k}", max(bc), "int")
+        put(f"AcmeBurstCheaperTransformer{k}", bc[learned.index("transformer")], "int")
+        put(f"AcmeOracleBurstCheaper{k}", int((pa["burst/oracle"] < pa["delay/oracle"] - 1e-9).sum()), "int")
+        put(f"AcmeOracleMixGainPct{k}", 100 * (1 - M[f"AcmeMixPNineOverDelayOracle{k}"][0]), "int")
+        if "burst@4.1/transformer" in pdc:
+            put(f"AcmeHighBurstTransformerOverDelay{k}", (pdc["burst@4.1/transformer"] / pdc["delay/transformer"]).median(), "f1")
+    put("AcmeCapCompliantEvents", int(((r["who"] == "cap") & (r["compliance"] >= 0.99)).sum()), "int")
+    put("AcmeHighPrice", 4.1, "f2")
+    put("AcmeCheapPrice", 1.5, "f2")
+    # what burst-only (transformer) moves: jobs with > 1 h left, share of jobs and of cloud dollars
+    b = pd.read_csv(RESULTS / "acme_e1" / "bursts.csv", dtype={"setting": str, "predictor": str, "job_id": str}).fillna({"setting": "", "predictor": ""})
+    g = b[(b["policy"] == "burst") & (b["predictor"] == "transformer") & (b["setting"] == "")]
+    lng = g["burst_rem_s"] > 3600
+    put("AcmeBurstLongJobsPct", 100 * lng.mean(), "int")
+    put("AcmeBurstLongUsdPct", 100 * g.loc[lng, "usd"].sum() / g["usd"].sum(), "int")
+    put("AcmeBurstMedianRemMin", g["burst_rem_s"].median() / 60, "int")
+    # calibration and set-up
+    cal = pd.read_csv(RESULTS / "acme_baseline" / "calibration.csv").iloc[0]
+    put("AcmeSimGpuPowerW", cal["sim_mean_gpu_power_w"], "f1")
+    put("AcmeCdfGpuPowerW", cal["cdf_gpu_mean_w"], "f1")
+    put("AcmeFloorKw", cal["floor_kw"], "int")
+    put("AcmeFacilityMeanKw", cal["facility_mean_kw"], "int")
+    st = pd.read_csv(RESULTS / "acme_motivation" / "stats.csv").set_index("name")["value"]
+    for name, kind in (("seren_evening_long_gpu_share_pct", "int"), ("philly_evening_long_gpu_share_pct", "int"),
+                       ("kalos_evening_running_jobs_mean", "f1"), ("seren_wall_median_min", "f1"), ("philly_wall_median_min", "f1"),
+                       ("seren_gpuh_share_ge256_pct", "int"), ("seren_max_gpus", "int"), ("sim_jobs", "int"), ("test_jobs", "int"),
+                       ("warmup_jobs", "int"), ("carry_jobs", "int")):
+        put(camel("acme_mot_" + name), st[name], kind)
+    # Acme predictor accuracy (Track 1, A2)
+    am = pd.read_csv(ROOT / "ml" / "results" / "acme_predictor_metrics.csv", dtype={"elapsed_s": str})
+    am = am[am["elapsed_s"] == "all"].set_index("predictor")
+    for p, nm in list(PRED_NAMES.items()) + [("lightgbm_notype", "LightgbmNotype")]:
+        if p in am.index and p != "oracle":
+            put(f"AcmePred{nm}Pinball", am.loc[p, "pinball"], "f3")
+            put(f"AcmePred{nm}Auroc", am.loc[p, "auroc_failed"], "f3")
+            put(f"AcmePred{nm}Logloss", am.loc[p, "logloss"], "f3")
 
 
 def fmt(v, kind):

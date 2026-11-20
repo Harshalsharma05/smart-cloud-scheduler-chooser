@@ -36,7 +36,7 @@ with 5 policies: every field of every row identical with and without it; 16.8 ->
 all 90 events (Philly: 125x / 30x and 111x / 23x). With every learned predictor burst-only is cheaper than delay in 0 of 90 events at w_f = 0
 (transformer 1 of 90 at w_f = 1); even with exact runtimes (oracle) in 2 of 90. A cheaper cloud does not change this: at $1.50/GPU-h burst-only is
 still 6.7x (transformer) and 4.5x (oracle, cheaper in 1 of 10) delay; at $4.10 it is 18x. The cloud bill again comes from a few long jobs:
-jobs with more than 1 h left are 36% of the jobs burst-only moves (transformer) but 99% of its cloud dollars.
+jobs with more than 1 h left are 35% of the jobs burst-only moves (transformer; 35.5%, corrected in step 36) but 99% of its cloud dollars.
 **Delay is the cheapest compliant single action in every cell** (cap complies in 1 of 90 events; its median $/MWh is only defined because it
 sheds more than 10% of the target).
 

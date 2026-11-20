@@ -86,7 +86,7 @@ def main():
     c = compare(d)
     c.to_csv(RESULTS / "e3" / "compare_rules.csv", index=False)
     print(c.round(3).to_string(index=False))
-    f8(d)
+    f8(d, single=True)            # W11: panel (a) only, one column (page budget)
     t3(d, pd.read_csv(ROOT / "ml" / "results" / "predictor_metrics.csv"))
 
 

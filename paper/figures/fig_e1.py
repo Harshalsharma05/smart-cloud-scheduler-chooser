@@ -17,7 +17,7 @@ df = load_runs("e1")
 cuts = sorted(df["cut"].unique())
 durs = sorted(df["duration_h"].unique())
 who = [w for w in COLORS if w in set(df["who"])]
-fig, axes = plt.subplots(1, len(cuts), figsize=(WIDTH_IN * 2, 2.9), sharey=True, constrained_layout=True)
+fig, axes = plt.subplots(1, len(cuts), figsize=(WIDTH_IN * 2, 2.55), sharey=True, constrained_layout=True)   # W11: 2.9 -> 2.55 in
 for ax, cut in zip(np.atleast_1d(axes), cuts):
     notes = {}                                   # non-compliant policy -> shed % of target per event length
     for w in who:

@@ -2,27 +2,28 @@
 % Not printed (given in the text or in the artifact): Cloud PUE; Cap curve (r, speed), pessimistic; Minimum billed time; Delay cost / cloud price; Delay weight of Failed/Killed; Jobs with a deadline; Deadline slack (min, max); Event duration; Event cut; Events per duration and cut; Look-ahead after an event; Trace warm-up before the test window; Job GPU utilisation (until measured).
 \begin{table}[t]
 \centering
-\caption{Main simulator parameters. \textit{Assumption}: no published source; other values are given in the text or in the artifact.}
+\caption{Main simulator parameters (one value: both traces). Source \emph{x / y}: Philly / Acme; \textit{assumption}: no published source.}
 \label{tab:params}
 \footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{2.45cm}>{\raggedright\arraybackslash}p{1.05cm}>{\raggedright\arraybackslash}p{1.75cm}@{}}
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.55cm}>{\raggedright\arraybackslash}p{0.8cm}>{\raggedright\arraybackslash}p{0.8cm}>{\raggedright\arraybackslash}p{1.15cm}>{\raggedright\arraybackslash}p{2.0cm}@{}}
 \toprule
-Parameter & Value & Unit & Source \\
+Parameter & Philly & Acme & Unit & Source \\
 \midrule
-GPU idle power & 70 & W & \cite{you23} \\
-GPU max power & 250 & W & P100 datasheet \\
-Host power per GPU, idle & 100 & W & \textit{assumption} \\
-Host power per GPU, extra if busy & 50 & W & \textit{assumption} \\
-On-prem PUE & 1.58 & -- & Uptime Inst.\ 2023 \\
-Cap curve (r, speed) & (0.3,0.55) (0.5,0.8) (0.7,0.93) (1,1) & -- & \textit{assumption} \\
-Cap levels (x max power) & 1, 0.9, 0.8, 0.7, 0.6 & -- & design choice \\
-Cloud price & 3.06 & USD per GPU-h & AWS on-demand \\
-Cloud boot delay & 300 & s & \cite{mao12} \\
-Migration overhead & 120 & s & \textit{assumption} \\
-Resume overhead & 60 & s & \textit{assumption} \\
-Cloud GPU limit & 1000 & GPUs & design choice \\
-Missed-deadline multiplier & 1 & -- & design choice \\
+GPU idle power & 70 & 63 & W & \cite{you23} / \cite{hu24} \\
+GPU max power & 250 & 400 & W & datasheet \\
+Host power/GPU, idle & 100 & 115 & W & \textit{assumption} / \cite{hu24} \\
+Host power/GPU, if busy & 50 & 163 & W & \textit{assumption} / \cite{hu24} \\
+On-prem PUE & \multicolumn{2}{>{\raggedright\arraybackslash}p{1.75cm}}{1.58} & -- & Uptime Inst.\ 2023 \\
+Cap curve (r, speed) & \multicolumn{2}{>{\raggedright\arraybackslash}p{1.75cm}}{(0.3,0.55) (0.5,0.8) (0.7,0.93) (1,1)} & -- & \textit{assumption} \\
+Cap levels (x max) & \multicolumn{2}{>{\raggedright\arraybackslash}p{1.75cm}}{1, 0.9, 0.8, 0.7, 0.6} & -- & design choice \\
+Cloud price per GPU-h & 3.06 & 2.745 & USD & AWS on-demand \\
+Cloud boot delay & \multicolumn{2}{>{\raggedright\arraybackslash}p{1.75cm}}{300} & s & \cite{mao12} \\
+Migration overhead & \multicolumn{2}{>{\raggedright\arraybackslash}p{1.75cm}}{120} & s & \textit{assumption} \\
+Resume overhead & \multicolumn{2}{>{\raggedright\arraybackslash}p{1.75cm}}{60} & s & \textit{assumption} \\
+Cloud GPU limit & \multicolumn{2}{>{\raggedright\arraybackslash}p{1.75cm}}{1000} & GPUs & design choice \\
+Missed-deadline factor & \multicolumn{2}{>{\raggedright\arraybackslash}p{1.75cm}}{1} & -- & design choice \\
+GPU utilisation & per job & 0.612 & -- & trace / calibrated \\
 \bottomrule
 \end{tabular}
 \end{table}

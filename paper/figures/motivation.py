@@ -138,8 +138,8 @@ def main():
     add("week_start_pt", WEEK_START, "start of the week shown in panel (c)")
 
     # ---------------- figure
-    fig = plt.figure(figsize=(2 * WIDTH_IN + 0.2, 5.2))
-    gs = fig.add_gridspec(2, 2, left=0.105, right=0.99, top=0.95, bottom=0.17, hspace=0.62, wspace=0.22)
+    fig = plt.figure(figsize=(2 * WIDTH_IN + 0.2, 4.1))   # W11: 5.2 -> 4.1 in (page budget)
+    gs = fig.add_gridspec(2, 2, left=0.105, right=0.99, top=0.95, bottom=0.2, hspace=0.62, wspace=0.22)
     ax_a, ax_b, ax_c, ax_d = (fig.add_subplot(gs[i, j]) for i in (0, 1) for j in (0, 1))
     # (a) shares by status
     rows = [("jobs", "job count"), ("gpu_h", "GPU-hours")]
@@ -201,8 +201,8 @@ def main():
     fig.legend(handles=[Line2D([0], [0], color=LINEC[s], ls=STYLE[s]["ls"], lw=1.3, label=s) for s in STATUSES] +
                [Patch(facecolor="#fdae61", alpha=0.45, label="17:00-20:00 PT")],
                loc="lower center", ncol=4, frameon=False, fontsize=7, bbox_to_anchor=(0.74, 0.0))
-    fig.text(0.3, 0.075, "status (panel a)", ha="center", fontsize=6.5)
-    fig.text(0.74, 0.075, "line style (panel b), shading (panel c)", ha="center", fontsize=6.5)
+    fig.text(0.3, 0.085, "status (panel a)", ha="center", fontsize=6.5)
+    fig.text(0.74, 0.085, "line style (panel b), shading (panel c)", ha="center", fontsize=6.5)
     path = save(fig, "f2_motivation")
     fig.savefig(path.with_suffix(".png"), dpi=200)
     plt.close(fig)
