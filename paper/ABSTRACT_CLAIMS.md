@@ -14,7 +14,7 @@ Philly: 84 feasible events (6 infeasible excluded). Acme (Seren): 90 events, non
    E2); Acme at $1.50/GPU-h 6.65x (transformer) and 4.55x (oracle), per-event median, default cell; c_delay stays at the base price in both.
 4. **Claim f (Philly 5-16%)** holds only under the default cap curve (pessimistic curve: default-cell ratio 1.00, cheaper in 6 of 10) and at
    w_f = 0; in-sample masking moves each ratio by at most 0.029.
-5. **Claim g ("not at all on Acme")** is the w_f = 0 median over 90 events: 1.000 (gbdt, lightgbm) to 1.011 (transformer); at w_f = 1 the
+5. **Claim g ("by at most 1.5% on Acme", W12)** covers both weightings: w_f = 0 medians 1.000 (gbdt, lightgbm) to 1.011 (transformer); at w_f = 1 the
    learned mixes are 0.985-1.000 (about 1.5% at most). "Exact runtimes would save 17%" is the oracle mix, median ratio 0.827 (64 of 90 cheaper).
 6. Acme cloud price: $2.745/A100-h (p4d.24xlarge listing on 2026-11-19), not the older ~$4.10; at $4.10 burst-only is 18.1x delay.
 
@@ -28,5 +28,5 @@ Philly: 84 feasible events (6 infeasible excluded). Acme (Seren): 90 events, non
 | d | a cheaper cloud does not change this | Philly spot $0.43: 18x; Acme $1.50: 6.65x (transformer), 4.55x (oracle) | `results/e2`, `results/acme_e1/runs.csv` (setting price=1.5) |
 | e | the cloud bill covers a job's whole remaining runtime, so long jobs make bursting much worse | Acme burst-only (transformer): jobs with > 1 h left are 35% of burst jobs and 99% of the cloud $; Philly: 86.8% of running jobs at event starts have run > 12 h; burst/delay 125x (Philly) vs 12x (Acme) | `results/acme_e1/bursts.csv`, `results/motivation/stats.csv` |
 | f | The predictor-guided mix beats delay by 5–16% on Philly under our default cap curve | mix-p90 / delay-only per-event median, 84 events, w_f 0: transformer 0.945, gbdt 0.839, lightgbm 0.870; pessimistic cap curve 1.00; masking shift 0.029 | `results/e1`, `results/e1_learned`, `results/t4`, `results/robust_insample` |
-| g | not at all on Acme, where exact runtimes would save 17% | Acme mix-p90 / delay-only, 90 events, w_f 0: learned 1.000-1.011; oracle 0.827 (17% cheaper) | `results/acme_e1/runs.csv` |
+| g | by at most 1.5% on Acme, where exact runtimes would save 17% | Acme learned mix-p90 / delay-only, 90 events: 1.000-1.011 (w_f 0), 0.985-1.000 (w_f 1), so the largest gain is 1.5% (gradient-boosted trees at w_f 1); oracle 0.827 at w_f 0 (17% cheaper) | `results/acme_e1/runs.csv` |
 | h | Reading predictions naively for long-running jobs makes the controller 11 to 68 times more expensive | Philly transformer mix, default cell, contract vs hold: 68x (p50, w_f 0), 39x (p90, w_f 0), 22x (p50, w_f 1), 11x (p90, w_f 1) | `results/e3/runs_default.csv`, `results/e3/runs_default_hold.csv` |

@@ -434,6 +434,8 @@ def acme(M, put, cfg):
         if "burst@4.1/transformer" in pdc:
             put(f"AcmeHighBurstTransformerOverDelay{k}", (pdc["burst@4.1/transformer"] / pdc["delay/transformer"]).median(), "f1")
     put("AcmeCapCompliantEvents", int(((r["who"] == "cap") & (r["compliance"] >= 0.99)).sum()), "int")
+    # W12: largest gain of a learned p90 mix over delay-only on Acme, over both weightings (w_f = 1: 0.985 -> 1.5%)
+    put("AcmeLearnedMixGainMaxPct", 100 * (1 - min(M["AcmeLearnedMixMinZero"][0], M["AcmeLearnedMixMinOne"][0])), "f1")
     put("AcmeHighPrice", 4.1, "f2")
     put("AcmeCheapPrice", 1.5, "f2")
     # what burst-only (transformer) moves: jobs with > 1 h left, share of jobs and of cloud dollars
