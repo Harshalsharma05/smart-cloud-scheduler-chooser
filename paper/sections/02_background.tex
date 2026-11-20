@@ -6,7 +6,7 @@
 \subsection{Demand response and dollars per MWh}
 Electric grids must balance supply and demand at every moment, and operators ask large consumers to reduce their load for a few hours when demand is high. This practice is called demand response~\cite{liu13}. A data center can take part because part of its load is flexible in time: batch work can wait, and equipment can run slower.
 
-A request asks for a power cut by a fraction for a given number of hours (Section~\ref{sec:problem}), and a cluster should ask not only whether it can comply, but at what price. Delaying a job costs the value of the delayed GPU-hours, capping slows work, and cloud GPUs cost the cloud bill. We express every action in dollars per MWh of load actually removed: this puts the three on one energy-based scale and, unlike a count of delayed jobs, exposes an action that sheds little energy for much money.
+A request asks for a power cut by a fraction for a given number of hours (Section~\ref{sec:problem}), and a cluster should ask not only whether it can comply, but at what price. Delaying a job costs the value of the delayed GPU-hours, capping slows work, and cloud GPUs cost the cloud bill. We express every action in dollars per MWh of load actually removed: this puts the three on one scale and exposes an action that sheds little energy for much money.
 
 \subsection{What the Philly trace shows}
 We use the Microsoft Philly trace~\cite{jeon19}, which records deep-learning jobs on a shared multi-tenant GPU cluster. The test window contains \MotTestJobs{} jobs and \MotTestGpuHours{} GPU-hours of work, which our simulator runs on a pool of \MotTestPoolGpus{} GPUs. Figure~\ref{fig:motivation} shows four facts that shape the problem.
