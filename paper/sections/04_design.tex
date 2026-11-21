@@ -7,7 +7,7 @@ Figure~\ref{fig:overview} shows how the parts connect.
 \input{figures/f3_overview}
 
 \subsection{Controller}
-The controller plans once at the event start $t_s$ and then relies on admission gating: power can only fall as jobs end, so holding back new starts that would exceed $P^\star$ keeps the cluster under the target for the rest of the event.
+The controller plans once at the event start $t_s$ and then relies on admission gating: because power can only fall as jobs end, holding back new starts that would exceed $P^\star$ keeps the cluster under the target for the rest of the event.
 For every running job $j$ it reads from a predictor the remaining runtime $\hat r_j$ and the probability $q_j=1-p^{\text{fail}}_j-p^{\text{cancel}}_j$ that the job ends with useful output. It then estimates three costs, all in dollars:
 \begin{align}
 \hat c_{\text{hold}}(j)&=c_d\,g_j\tfrac{D}{3600}\,q_j+\hat c_{\text{ddl}}(j),\label{eq:hold}\\
