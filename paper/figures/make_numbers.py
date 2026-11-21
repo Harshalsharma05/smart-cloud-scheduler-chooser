@@ -269,6 +269,23 @@ def compute():
         put(f"Sens{nm_}Ratio", sens.loc[key, "ratio"], "f2")
         put(f"Sens{nm_}Cheaper", sens.loc[key, "cheaper"], "int")
     put("SensEvents", sens.loc["default", "events"], "int")
+    # W15: missed-deadline multiplier m = 0 and 3 vs the default m = 1 (p90 mix / delay-only, default cell)
+    put("SensMissShiftMax", max(abs(sens.loc[k, "ratio"] - sens.loc["default", "ratio"]) for k in ("m=0", "m=3")), "f2")
+    # W15: synthetic deadlines (flex.yaml D12) and E4 user impact, Philly default cell, transformer predictor
+    put("DeadlineSharePct", 100 * cfg["deadlines"]["fraction"], "int")
+    put("DeadlineSlackMin", cfg["deadlines"]["slack_min"], "int")
+    put("DeadlineSlackMax", cfg["deadlines"]["slack_max"], "int")
+    e4 = pd.read_csv(RESULTS / "e4" / "summary.csv")
+    e4 = e4[(e4["duration_h"] == DEFAULT[0]) & (e4["cut"] == DEFAULT[1])]
+    plain = e4["setting"].isna()
+    for nm_, sel in (("Delay", plain & (e4["policy"] == "delay") & (e4["predictor"] == "transformer")),
+                     ("MixPNine", (e4["policy"] == "mix") & (e4["selector"] == "predictor:transformer") & (e4["setting"] == "cq=p90")),
+                     ("Burst", plain & (e4["policy"] == "burst") & (e4["selector"] == "predictor:transformer")),
+                     ("Cap", plain & (e4["policy"] == "cap"))):
+        row = e4[sel]
+        assert len(row) == 1, (nm_, len(row))
+        put(f"Efour{nm_}MissedMedian", row["missed_deadlines_median"].iloc[0], "f1")
+    put("EfourEvents", e4[plain & (e4["policy"] == "cap")]["n_events"].iloc[0], "int")
     sa = pd.read_csv(RESULTS / "s13" / "sweepA_ratios.csv")
     sa = sa[sa["boot"] == cfg["cloud"]["boot_delay_s"]].set_index("price")                 # default boot delay; $/MWh ratios, default cell
     for price, nm_ in ((0.43, "Spot"), (1.5, "Low"), (3.06, "Base"), (6.12, "Double")):
