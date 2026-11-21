@@ -292,7 +292,7 @@ def build(N):
     # ---- title bar (template rectangle, logos left and right)
     layers, heads, params, hist = transformer_facts()
     title = f"Cloud Bursting Rarely Pays for Demand Response in\vOn-Premise GPU Clusters (Project No. {BLANK})"
-    names = (f"Harshal Sharma (23BCP298), Anuj Sharma ({BLANK}) | Guide: Dr. Riddhi Thakkar, Assistant Professor, "
+    names = (f"Harshal Sharma (23BCP298), Anuj Sharma (23BCP289) | Guide: Dr. Riddhi Thakkar, Assistant Professor, "
              "Department of Computer Science and Engineering, School of Technology, PDEU")
     logo_w = 5.9
     tw = X1 - X0 - 2 * (logo_w + 0.5) - 0.4
