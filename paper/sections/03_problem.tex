@@ -3,7 +3,7 @@
 \providecommand{\RESULT}[1]{\textbf{[#1]}}   % marks a result number that must come from numbers.tex (see the W2 report)
 \section{Problem Formulation}
 \label{sec:problem}
-We model a GPU cluster that receives a request to reduce its electrical load for a limited time, and ask what the cheapest way to comply is.
+We model a GPU cluster that receives a request to reduce its electrical load for a limited time, and ask which way of complying is the cheapest.
 The cluster is a pool of $G$ GPUs. A job $j$ needs $g_j$ GPUs, has a mean GPU utilisation $u_j$, a wall-clock runtime $w_j$ and ends with a status in $\{\textit{Pass}, \textit{Failed}, \textit{Killed}\}$.
 
 \subsection{Grid event and target}
@@ -12,7 +12,7 @@ Let $P_0(t)$ be the facility power if the cluster takes no action (the baseline)
 \begin{equation}
 P^\star=(1-\kappa)\,\bar P_0,\qquad \bar P_0=\tfrac{1}{D}\int_{t_s}^{t_s+D}P_0(t)\,dt .
 \end{equation}
-A policy is judged against the baseline from the same starting state (a paired run). Its shed energy is
+A policy is evaluated against the baseline from the same starting state (a paired run). Its shed energy is
 \begin{equation}
 E_{\text{shed}}=\int_{t_s}^{t_s+D}\bigl(P_0(t)-P(t)\bigr)\,dt ,
 \end{equation}
@@ -30,11 +30,11 @@ P(t)=\text{PUE}\Bigl[&\sum_{j\in\text{running}} g_j\,P_{\text{gpu}}(u_j,f)+N_i P
 &+G\,H_{\text{idle}}+N_b H_{\text{busy}}\Bigr],
 \end{split}
 \end{equation}
-with the power usage effectiveness PUE, a host power $H_{\text{idle}}$ per installed GPU, and an extra host power $H_{\text{busy}}$ per busy GPU. The cap does not change host power. Power is constant between simulator events, so energies are exact.
+with the power usage effectiveness PUE, a host power $H_{\text{idle}}$ per installed GPU, and an extra host power $H_{\text{busy}}$ per busy GPU. The cap does not change host power. Because power is constant between simulator events, energies are exact.
 Even with every job removed, the cluster draws the idle floor $P_{\text{floor}}=\text{PUE}\cdot G\,(P_{\text{idle}}+H_{\text{idle}})$. An event with $P^\star<P_{\text{floor}}$ cannot be met by any policy; we call it \emph{infeasible} and exclude it from all results.
 
 \subsection{Actions}
-At the event start the cluster may use three actions on running jobs; all other jobs are scheduled first-come first-served with skip-ahead and no runtime estimates.
+At the event start, the cluster may apply three actions to running jobs; all other jobs are scheduled first-come first-served with skip-ahead and no runtime estimates.
 \emph{Suspend.} The job's GPUs are freed at once and its progress is kept. Suspended jobs resume when the event ends, in submission order, each paying a restore overhead $\tau_r$ of extra work. Any new job that would push power above $P^\star$ is held in the queue until the event ends (admission gating); held jobs count as delay.
 \emph{Cap.} A cluster-wide level $f$ from a small discrete set applies to all on-premise GPUs. A job whose uncapped power is $P_{\text{gpu}}(u_j,1)$ runs at speed $s_j(f)=1$ if $r_j=fP_{\max}/P_{\text{gpu}}(u_j,1)\ge 1$, and otherwise at $s_j(f)=\sigma(r_j)$, an assumed piecewise-linear curve (Table~\ref{tab:params}) anchored by one published measurement of about 22\% less server power for about 10\% slower work~\cite{patel24}; capping has also been measured at HPC scale~\cite{zhao23}. A slower job finishes later, and power falls only through the job's lower GPU draw.
 \emph{Burst.} The job is checkpointed and its on-premise GPUs are freed at once. A cloud instance with $g_j$ GPUs is requested, boots for $\tau_b$, then finishes the job at full speed after an extra migration overhead $\tau_m$ (checkpoint transfer and warm-up). The job never returns on premise. The cloud bills $\pi$ per GPU-hour from the moment the instance is ready until it is released, with a minimum billed time, and at most $C_{\max}$ cloud GPUs may be in use at once. Boot, checkpoint and restore overheads follow measured ranges~\cite{mao12,mohan21}.
@@ -51,7 +51,7 @@ where $C_{\text{cloud}}$ is the cloud bill, $w_f$ is the weight of delay on jobs
 \begin{equation}
 \text{USD/MWh}=C/E_{\text{shed}}\quad\text{if }E_{\text{shed}}\ge 0.1\,\kappa\,\bar P_0 D,\label{eq:usdmwh}
 \end{equation}
-and undefined otherwise, so a policy that barely sheds does not look cheap. A policy whose compliance is below $99\%$ is never reported as a winner.
+and undefined otherwise, so a policy that barely sheds does not appear cheap. A policy whose compliance is below $99\%$ is never reported as a winner.
 
 \begin{center}
 \fbox{\begin{minipage}{0.94\columnwidth}\small
