@@ -7,6 +7,7 @@ literal numbers, word count. Everything except sentence index and word count mus
 the word count must not increase.
 """
 import json
+import os
 import re
 import sys
 from collections import Counter
@@ -17,7 +18,8 @@ FILES = ["main.tex"] + [f"sections/{n}.tex" for n in (
     "01_introduction", "02_background", "03_problem", "04_design", "05_methodology", "06_evaluation",
     "07_related", "08_discussion", "09_references")]
 BASE = P / "build" / "invariants_before.json"
-MATH = re.compile(r"\$\$.*?\$\$|\$.*?\$|\\\(.*?\\\)|\\\[.*?\\\]"
+SRC = Path(os.environ.get("INV_SRC", P))   # baseline is built from the pre-restyle commit
+MATH = re.compile(r"\$\$.*?\$\$|(?<!\\)\$.*?(?<!\\)\$|\\\(.*?\\\)|\\\[.*?\\\]"
                   r"|\\begin\{(equation\*?|align\*?|eqnarray\*?)\}.*?\\end\{\1\}", re.S)
 CMD_WITH_ARG = re.compile(r"\\(?:cite\w*|ref|eqref|label|input|includegraphics|url|href|footnote\w*)(\[[^\]]*\])?\{[^}]*\}")
 
@@ -39,7 +41,7 @@ def sentences(t):
 
 
 def extract(name):
-    raw = (P / name).read_text(encoding="utf-8")
+    raw = (SRC / name).read_text(encoding="utf-8")
     t = body(name, strip_comments(raw))
     out = {}
     cites = []
